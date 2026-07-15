@@ -31,29 +31,30 @@ import net.geoprism.geoai.explorer.core.service.GraphQueryService;
 @ConditionalOnProperty(name = "explorer.search", havingValue = "jena")
 public class JenaSearchService extends BasicSearchService
 {
-  public static String  JENA_FULL_TEXT_LOOKUP = GraphQueryService.PREFIXES + """
-            PREFIX   ex: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
-          PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-          PREFIX text: <http://jena.apache.org/text#>
-          PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+  
+  protected String getSparqlQuery()
+  {
+    return """
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX text: <http://jena.apache.org/text#>
+      PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+      PREFIX lpg: <%s>
 
-          SELECT ?uri ?type ?code ?label ?wkt
-          FROM <https://localhost:4200/lpg/graph_801104/0#>
-          WHERE {{
-            (?uri ?score) text:query (rdfs:label ?query) .
-            ?uri lpgs:GeoObject-code ?code .
-            ?uri rdfs:label ?label .
-            ?uri a ?type .
-            OPTIONAL {
-                ?uri geo:hasGeometry ?g .
-                ?g geo:asWKT ?wkt .
-            }
-          }}
-          ORDER BY DESC(?score)
-      """;
-
-  @Autowired
-  private AppProperties properties;
+      SELECT ?uri ?type ?code ?label ?wkt
+      FROM <%s>
+      WHERE {
+        (?uri ?score) text:query (rdfs:label ?query) .
+        ?uri lpg:GeoObject-code ?code .
+        ?uri rdfs:label ?label .
+        ?uri a ?type .
+        OPTIONAL {
+            ?uri geo:hasGeometry ?g .
+            ?g geo:asWKT ?wkt .
+        }
+      }
+      ORDER BY DESC(?score)
+            """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
+  }
 
   public LocationPage fullTextLookup(String query, int offset, int limit)
   {
@@ -61,7 +62,7 @@ public class JenaSearchService extends BasicSearchService
 
     try (RDFConnection conn = graph.createConnection())
     {
-      var sparql = JENA_FULL_TEXT_LOOKUP;
+      var sparql = getSparqlQuery();
       sparql += " LIMIT " + limit + " OFFSET " + offset;
 
       // Use ParameterizedSparqlString to inject the URI safely
@@ -97,7 +98,7 @@ public class JenaSearchService extends BasicSearchService
     page.setCount(results.size());
     page.setLimit(100);
     page.setOffset(0);
-    page.setStatement(JENA_FULL_TEXT_LOOKUP.replace("?query", FmtUtils.stringForString(query)));
+    page.setStatement(getSparqlQuery().replace("?query", FmtUtils.stringForString(query)));
 
     return page;
   }

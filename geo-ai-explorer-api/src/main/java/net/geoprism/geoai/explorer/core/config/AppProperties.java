@@ -19,6 +19,16 @@ public class AppProperties
   @Autowired
   private Environment env;
 
+  public String getSparqlGraph()
+  {
+    return "https://localhost:4200/lpg/graph_801104/0#";
+  }
+  
+  public String getLpgPrefix()
+  {
+    return "https://localhost:4200/lpg/rdfs#";
+  }
+  
   public String getChatAgentId()
   {
     return env.getProperty("bedrock.chat.agent.id");
