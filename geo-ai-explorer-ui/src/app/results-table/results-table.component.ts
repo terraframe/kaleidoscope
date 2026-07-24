@@ -103,6 +103,7 @@ export class ResultsTableComponent implements OnInit, OnDestroy {
     private loadingPageDisplayKeys = new Set<string>();
 
     private _collapsed = false;
+    private _resizable = true;
 
     private readonly expandedDefaultHeightPx = 360;
     private readonly collapsedHeightPx = 0;
@@ -116,10 +117,19 @@ export class ResultsTableComponent implements OnInit, OnDestroy {
     private resizeStartHeightPx = 0;
 
     @HostBinding('style.height.px')
-    get hostHeightPx(): number {
+    get hostHeightPx(): number | null {
+        if (!this.resizable) {
+            return null;
+        }
+
         return this.collapsed
             ? this.collapsedHeightPx
             : this.panelHeightPx;
+    }
+
+    @HostBinding('class.results-panel-fill')
+    get hostFillClass(): boolean {
+        return !this.resizable;
     }
 
     @HostBinding('class.results-panel-collapsed')
@@ -137,13 +147,27 @@ export class ResultsTableComponent implements OnInit, OnDestroy {
         const wasCollapsed = this._collapsed;
         this._collapsed = value;
 
-        if (wasCollapsed && !value) {
+        if (wasCollapsed && !value && this.workflowStep !== WorkflowStep.DisambiguateObject) {
             this.ensureActiveTypeLoaded();
         }
     }
 
     get collapsed(): boolean {
         return this._collapsed;
+    }
+
+    @Input()
+    set resizable(value: boolean) {
+        this._resizable = value;
+
+        // Handles the case where resizing is disabled during an active drag.
+        if (!value) {
+            this.stopResize();
+        }
+    }
+
+    get resizable(): boolean {
+        return this._resizable;
     }
 
     constructor(
@@ -155,13 +179,14 @@ export class ResultsTableComponent implements OnInit, OnDestroy {
 
         this.onWorkflowStepChange = this.workflowStep$.subscribe(step => {
             this.workflowStep = step;
+            this.rebuildPageDisplayState();
         });
 
         this.onPagesChange = this.pages$.subscribe(pages => {
             this.latestPages = pages ?? [];
             this.rebuildPageDisplayState();
 
-            if (!this.collapsed) {
+            if (!this.collapsed && this.workflowStep !== WorkflowStep.DisambiguateObject) {
                 this.ensureActiveTypeLoaded();
             }
         });
@@ -223,6 +248,13 @@ export class ResultsTableComponent implements OnInit, OnDestroy {
     }
 
     private rebuildPageDisplayState(): void {
+        if (this.workflowStep === WorkflowStep.DisambiguateObject) {
+            this.pageDisplayOptions = [];
+            this.displayedPageItems = this.getLoadedPageItems(this.latestPages)
+                .filter(item => item.page.count > 0);
+            return;
+        }
+
         const pageItems = this.getLoadedTypePageItems(this.latestPages)
             .filter(item => item.page.count > 0);
         const availableTypes = this.getAvailableTypes(this.latestPages);
@@ -421,13 +453,16 @@ export class ResultsTableComponent implements OnInit, OnDestroy {
         }));
     }
 
+    private getLoadedPageItems(pages: LocationPage[]): PageDisplayItem[] {
+        return pages.map((page, index) => ({
+            page,
+            index,
+            columns: this.getColumnsForPage(page)
+        }));
+    }
+
     private getLoadedTypePageItems(pages: LocationPage[]): PageDisplayItem[] {
-        return pages
-            .map((page, index) => ({
-                page,
-                index,
-                columns: this.getColumnsForPage(page)
-            }))
+        return this.getLoadedPageItems(pages)
             .filter(item => item.page.type != null && item.page.type.trim() !== '');
     }
 
@@ -647,14 +682,26 @@ export class ResultsTableComponent implements OnInit, OnDestroy {
             return a.localeCompare(b);
         });
 
-        if (fields.length === 0) {
-            fields.push('label');
-        }
-
-        return fields.map(field => ({
+        const columns = fields.map(field => ({
             field,
             header: this.getColumnHeader(field)
         }));
+
+        if (this.shouldShowTypeColumn(page)) {
+            columns.unshift({
+                field: 'type',
+                header: 'Type'
+            });
+        }
+
+        if (columns.length === 0) {
+            columns.push({
+                field: 'label',
+                header: 'Label'
+            });
+        }
+
+        return columns;
     }
 
     private getColumnHeader(field: string): string {
@@ -707,7 +754,7 @@ export class ResultsTableComponent implements OnInit, OnDestroy {
     }
 
     startResize(event: MouseEvent): void {
-        if (this.collapsed) {
+        if (!this.resizable || this.collapsed) {
             return;
         }
 

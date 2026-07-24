@@ -6,13 +6,14 @@
     [title]="collapsed ? 'Expand results' : 'Collapse results'"
     [attr.aria-label]="collapsed ? 'Expand results' : 'Collapse results'"
     [pTooltip]="collapsed ? 'Expand results' : 'Collapse results'"
+    *ngIf="resizable"
   >
     <fa-icon [icon]="collapsed ? expandIcon : collapseIcon"></fa-icon>
   </button>
 
   <div
     class="results-resize-handle"
-    *ngIf="!collapsed"
+    *ngIf="resizable && !collapsed"
     (mousedown)="startResize($event)"
     title="Resize results panel"
     pTooltip="Resize results panel"

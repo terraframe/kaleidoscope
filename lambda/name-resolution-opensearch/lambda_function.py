@@ -2,47 +2,83 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
-from opensearchpy import OpenSearch, RequestsHttpConnection
 from boto3 import Session
+from opensearchpy import OpenSearch, RequestsHttpConnection
 
 try:
-    # Native SigV4 auth support in opensearch-py
+    # Native SigV4 authentication support in opensearch-py.
     from opensearchpy import AWSV4SignerAuth
 except ImportError:
     AWSV4SignerAuth = None
 
 
-def str_to_bool(value: Optional[str], default: bool = False) -> bool:
+def str_to_bool(
+    value: Optional[str],
+    default: bool = False,
+) -> bool:
     if value is None:
         return default
 
-    return value.strip().lower() in ("1", "true", "yes", "y", "on")
+    return value.strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "y",
+        "on",
+    }
 
 
 def build_client() -> OpenSearch:
-    host = os.environ["OPENSEARCH_HOST"]  # example: search-my-domain.us-west-2.es.amazonaws.com
-    region = os.environ.get("AWS_REGION", os.environ.get("OPENSEARCH_REGION", "us-west-2"))
+    host = os.environ["OPENSEARCH_HOST"]
+
+    region = os.environ.get(
+        "AWS_REGION",
+        os.environ.get("OPENSEARCH_REGION", "us-west-2"),
+    )
+
     port = int(os.environ.get("OPENSEARCH_PORT", "443"))
-    use_ssl = str_to_bool(os.environ.get("OPENSEARCH_USE_SSL", "true"), True)
-    verify_certs = str_to_bool(os.environ.get("OPENSEARCH_VERIFY_CERTS", "true"), True)
-    use_iam = str_to_bool(os.environ.get("OPENSEARCH_USE_IAM", "true"), True)
+
+    use_ssl = str_to_bool(
+        os.environ.get("OPENSEARCH_USE_SSL", "true"),
+        True,
+    )
+
+    verify_certs = str_to_bool(
+        os.environ.get("OPENSEARCH_VERIFY_CERTS", "true"),
+        True,
+    )
+
+    use_iam = str_to_bool(
+        os.environ.get("OPENSEARCH_USE_IAM", "true"),
+        True,
+    )
 
     http_auth = None
 
     if use_iam:
         if AWSV4SignerAuth is None:
             raise RuntimeError(
-                "OPENSEARCH_USE_IAM=true but AWSV4SignerAuth is unavailable. "
-                "Add opensearch-py with SigV4 support."
+                "OPENSEARCH_USE_IAM=true but AWSV4SignerAuth "
+                "is unavailable. Install a version of "
+                "opensearch-py with SigV4 support."
             )
 
         credentials = Session().get_credentials()
 
         if credentials is None:
-            raise RuntimeError("Could not resolve AWS credentials for OpenSearch IAM auth.")
+            raise RuntimeError(
+                "Could not resolve AWS credentials for "
+                "OpenSearch IAM authentication."
+            )
 
-        frozen = credentials.get_frozen_credentials()
-        http_auth = AWSV4SignerAuth(frozen, region, "es")
+        frozen_credentials = credentials.get_frozen_credentials()
+
+        http_auth = AWSV4SignerAuth(
+            frozen_credentials,
+            region,
+            "es",
+        )
+
     else:
         username = os.environ.get("OPENSEARCH_USERNAME")
         password = os.environ.get("OPENSEARCH_PASSWORD")
@@ -51,7 +87,12 @@ def build_client() -> OpenSearch:
             http_auth = (username, password)
 
     return OpenSearch(
-        hosts=[{"host": host, "port": port}],
+        hosts=[
+            {
+                "host": host,
+                "port": port,
+            }
+        ],
         http_auth=http_auth,
         use_ssl=use_ssl,
         verify_certs=verify_certs,
@@ -77,7 +118,11 @@ def tokenize(value: Optional[str]) -> List[str]:
     if not normalized:
         return []
 
-    return [part.strip() for part in normalized.split() if part.strip()]
+    return [
+        part.strip()
+        for part in normalized.split()
+        if part.strip()
+    ]
 
 
 def add_keyword_term(
@@ -103,25 +148,17 @@ def build_query(name: str) -> Dict[str, Any]:
     """
     Search strategy:
 
-    1. Exact whole-query matches get huge boosts.
-       Example:
-         "reach_25" exactly matches code.keyword.
+    1. Exact whole-query matches get the largest boosts.
+    2. Exact token matches rescue mixed queries such as:
+         channel reach_25
+    3. AND full-text matching provides a high-quality search path.
+    4. OR and fuzzy matching prevent noisy words from eliminating results.
 
-    2. Exact token matches get strong boosts.
-       Example:
-         "channel reach_25" can still exactly match token "reach_25"
-         against code.keyword.
+    Expected keyword fields:
 
-    3. Strong AND full-text match is kept as a boosted high-quality path.
-
-    4. OR full-text fallback prevents one bad/noisy word from killing all results.
-
-    Assumes your index has keyword subfields:
       - code.keyword
       - altLabel.keyword
       - label.keyword
-
-    If altLabel is multi-valued, this is fine in OpenSearch.
     """
 
     normalized_name = normalize_query(name)
@@ -129,31 +166,52 @@ def build_query(name: str) -> Dict[str, Any]:
 
     should_clauses: List[Dict[str, Any]] = []
 
-    # -------------------------------------------------------------------------
     # Whole-query exact matches.
-    # These are the strongest signals.
-    # -------------------------------------------------------------------------
-    add_keyword_term(should_clauses, "code.keyword", normalized_name, 1000)
-    add_keyword_term(should_clauses, "altLabel.keyword", normalized_name, 1000)
-    add_keyword_term(should_clauses, "label.keyword", normalized_name, 200)
+    add_keyword_term(
+        should_clauses,
+        "code.keyword",
+        normalized_name,
+        1000,
+    )
 
-    # -------------------------------------------------------------------------
+    add_keyword_term(
+        should_clauses,
+        "altLabel.keyword",
+        normalized_name,
+        1000,
+    )
+
+    add_keyword_term(
+        should_clauses,
+        "label.keyword",
+        normalized_name,
+        200,
+    )
+
     # Per-token exact matches.
-    # This is the important rescue path for queries like:
-    #
-    #   channel reach_25
-    #
-    # Even if "channel" is noisy, "reach_25" can still hit code.keyword exactly.
-    # -------------------------------------------------------------------------
     for token in tokens:
-        add_keyword_term(should_clauses, "code.keyword", token, 700)
-        add_keyword_term(should_clauses, "altLabel.keyword", token, 600)
-        add_keyword_term(should_clauses, "label.keyword", token, 150)
+        add_keyword_term(
+            should_clauses,
+            "code.keyword",
+            token,
+            700,
+        )
 
-    # -------------------------------------------------------------------------
-    # Phrase-style label matches.
-    # Good for normal human searches where the label contains the exact phrase.
-    # -------------------------------------------------------------------------
+        add_keyword_term(
+            should_clauses,
+            "altLabel.keyword",
+            token,
+            600,
+        )
+
+        add_keyword_term(
+            should_clauses,
+            "label.keyword",
+            token,
+            150,
+        )
+
+    # Phrase-oriented label searches.
     if normalized_name:
         should_clauses.append({
             "match_phrase": {
@@ -173,11 +231,7 @@ def build_query(name: str) -> Dict[str, Any]:
             }
         })
 
-    # -------------------------------------------------------------------------
-    # High-quality full-text path.
-    # This keeps your old "all terms should match" behavior, but only as one
-    # boosted option — not as the only way to get results.
-    # -------------------------------------------------------------------------
+    # High-quality full-text path requiring all terms.
     if normalized_name:
         should_clauses.append({
             "multi_match": {
@@ -194,15 +248,7 @@ def build_query(name: str) -> Dict[str, Any]:
             }
         })
 
-    # -------------------------------------------------------------------------
-    # Forgiving fallback full-text path.
-    # This is what prevents:
-    #
-    #   reach_25          -> many results
-    #   channel reach_25  -> zero results
-    #
-    # The OR fallback means at least one meaningful term can still hit.
-    # -------------------------------------------------------------------------
+    # More forgiving full-text fallback.
     if normalized_name:
         should_clauses.append({
             "multi_match": {
@@ -221,10 +267,7 @@ def build_query(name: str) -> Dict[str, Any]:
             }
         })
 
-    # -------------------------------------------------------------------------
-    # Per-token fuzzy-ish text matches.
-    # Helpful when a token is not an exact code but is still useful text.
-    # -------------------------------------------------------------------------
+    # Per-token fuzzy text matches.
     for token in tokens:
         should_clauses.append({
             "multi_match": {
@@ -244,78 +287,120 @@ def build_query(name: str) -> Dict[str, Any]:
 
     return {
         "size": 100,
-        "_source": ["code", "type", "uri", "label", "altLabel"],
+        "_source": [
+            "code",
+            "type",
+            "uri",
+            "label",
+            "altLabel",
+        ],
         "query": {
             "bool": {
                 "should": should_clauses,
                 "minimum_should_match": 1,
             }
         },
-        "sort": ["_score"],
+        "sort": [
+            "_score",
+        ],
     }
 
 
-def execute(name: str) -> List[Dict[str, str]]:
-    index_name = os.environ["OPENSEARCH_INDEX"]
-    client = build_client()
-    query = build_query(name)
+def execute(name: str) -> Dict[str, Any]:
+    try:
+        index_name = os.environ["OPENSEARCH_INDEX"]
 
-    print("OPENSEARCH QUERY:", json.dumps(query))
+        client = build_client()
+        query = build_query(name)
 
-    response = client.search(index=index_name, body=query)
+        print(
+            "OPENSEARCH QUERY:",
+            json.dumps(query, default=str),
+        )
 
-    results: List[Dict[str, str]] = []
-    hits = response.get("hits", {}).get("hits", [])
+        response = client.search(
+            index=index_name,
+            body=query,
+        )
 
-    for hit in hits:
-        source = hit.get("_source", {})
+        results: List[Dict[str, str]] = []
 
-        code = source.get("code")
-        item_type = source.get("type")
-        uri = source.get("uri")
+        hits = (
+            response
+            .get("hits", {})
+            .get("hits", [])
+        )
 
-        if code and item_type and uri:
+        for hit in hits:
+            source = hit.get("_source", {})
+
+            code = source.get("code")
+            item_type = source.get("type")
+            uri = source.get("uri")
+
+            if not code or not item_type or not uri:
+                continue
+
             results.append({
                 "code": str(code),
                 "type": str(item_type),
                 "uri": str(uri),
             })
 
-    return results
-
-
-def lambda_handler(event, context):
-    print("EVENT:", json.dumps(event))
-
-    agent = event["agent"]
-    action_group = event["actionGroup"]
-    function = event["function"]
-    parameters = event.get("parameters", [])
-
-    if not parameters or "value" not in parameters[0]:
         return {
-            "error": "Missing required 'value' parameter.",
-            "event": event,
+            "success": True,
+            "query": name,
+            "resultCount": len(results),
+            "results": results,
         }
 
-    value = parameters[0]["value"]
-    result = execute(value)
-
-    response_body = {
-        "TEXT": {
-            "body": json.dumps(result),
+    except KeyError as error:
+        return {
+            "success": False,
+            "error": (
+                f"Missing required environment variable: "
+                f"{error.args[0]}"
+            ),
         }
-    }
 
-    action_response = {
-        "actionGroup": action_group,
-        "function": function,
-        "functionResponse": {
-            "responseBody": response_body,
-        },
-    }
+    except Exception as error:
+        print(
+            "OPENSEARCH ERROR:",
+            repr(error),
+        )
 
-    return {
-        "response": action_response,
-        "messageVersion": event["messageVersion"],
-    }
+        return {
+            "success": False,
+            "error": (
+                "OpenSearch query failed: "
+                f"{type(error).__name__}: {error}"
+            ),
+        }
+
+
+def lambda_handler(
+    event: Dict[str, Any],
+    context: Any,
+) -> Dict[str, Any]:
+    print(
+        "EVENT:",
+        json.dumps(event, default=str),
+    )
+
+    if not isinstance(event, dict):
+        return {
+            "success": False,
+            "error": "Invalid request: expected a JSON object.",
+        }
+
+    name = event.get("name")
+
+    if not isinstance(name, str) or not name.strip():
+        return {
+            "success": False,
+            "error": (
+                "Missing or invalid required parameter: name"
+            ),
+        }
+
+    return execute(name.strip())

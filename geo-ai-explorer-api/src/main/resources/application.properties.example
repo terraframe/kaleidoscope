@@ -1,23 +1,36 @@
-# Agent ID and version alias ID of the bedrock agent responsible for chat responses
-bedrock.chat.agent.id=
-bedrock.chat.agent.alias.id=
+# Bedrock chat agent harness
+bedrock.chat.agent.harnessArn=
+bedrock.chat.agent.harnessEndpoint=DEFAULT
 
-# Agent ID and version alias ID of the bedrock agent responsible for generating location SPARQL
-bedrock.sparql.agent.id=
-bedrock.sparql.agent.alias.id=
-
-# AWS region of the bedrock agents
-bedrock.region=
+# Bedrock 'map it' agent harness
+bedrock.sparql.agent.harnessArn=
+bedrock.sparql.agent.harnessEndpoint=DEFAULT
 
 # URL of the JENA instance and dataset
-jena.url=http://example.com/jena:3030/inundation/
+sparql.url=http://example.com/jena:3030/inundation/
+
+mapbox.key=
+
+# OpenSearch
+#explorer.search=opensearch
+#opensearch.host=search-usace-test-example.aos.us-west-2.on.aws
+#opensearch.scheme=https
+#opensearch.port=443
+#opensearch.index=geo_objects
+#opensearch.iam=true
+
+# Jena search
+explorer.search=jena
+
+spring.security.user.name=example
+spring.security.user.password=example
 
 management.endpoints.web.exposure.include=health,info
 
-# User name and password able to log into the geo-ai-explorer server
-spring.security.user.name=
-spring.security.user.password=
+# Disable authentication (Don't deploy this)
+spring.profiles.active=dev
 
 # AWS access key and secret key for IAM user which can execute bedrock methods
-access.key.id=
-secret.access.key=
+aws.accessKeyId=
+aws.secretAccessKey=
+aws.region=us-west-2

@@ -29,24 +29,24 @@ public class AppProperties
     return "https://localhost:4200/lpg/rdfs#";
   }
   
-  public String getChatAgentId()
+  public String getChatAgentHarnessArn()
   {
-    return env.getProperty("bedrock.chat.agent.id");
+    return env.getProperty("bedrock.chat.agent.harnessArn");
   }
 
-  public String getChatAgentAliasId()
+  public String getChatAgentHarnessEndpoint()
   {
-    return env.getProperty("bedrock.chat.agent.alias.id");
+    return env.getProperty("bedrock.chat.agent.harnessEndpoint");
   }
 
-  public String getSparqlAgentId()
+  public String getSparqlAgentHarnessArn()
   {
-    return env.getProperty("bedrock.sparql.agent.id");
+    return env.getProperty("bedrock.sparql.agent.harnessArn");
   }
 
-  public String getSparqlAgentAliasId()
+  public String getSparqlAgentHarnessEndpoint()
   {
-    return env.getProperty("bedrock.sparql.agent.alias.id");
+    return env.getProperty("bedrock.sparql.agent.harnessEndpoint");
   }
 
   public Region getBedrockRegion()

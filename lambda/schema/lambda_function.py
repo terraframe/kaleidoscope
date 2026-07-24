@@ -1,11 +1,8 @@
+import json
+from typing import Any, Dict
 
-def lambda_handler(event, context):
-    agent = event['agent']
-    actionGroup = event['actionGroup']
-    function = event['function']
-    parameters = event.get('parameters', [])
 
-    schema = """
+SCHEMA = """
 The database does NOT include any data in the default graph. When executing queries, you must always specify one or more graphs in the FROM clause, or you may specify a graph wildcard to query all graphs.
 
 Most of this data is centered around flooding usecases. Questions about population can be answered by utilizing the 'population' attribute on CensusTract. Questions about flooded objects (i.e. hospitals or schools) can usually be answered by navigating to a LeveeArea or a LeveedArea and then navigating the relationship to find the affected objects. Finally, there exists InundationArea, which is the result of a flood water inundation analysis expert system, represented as a polygon. By traversing the 'InundatedObject' edge, you can determine which objects were predicted to be 'inundated' (or flooded) based on the flood water inundation analysis.
@@ -416,22 +413,8 @@ ORDER BY DESC(?totalCost)
 
     """
 
-    # Execute your business logic here. For more information, refer to: https://docs.aws.amazon.com/bedrock/latest/userguide/agents-lambda.html
-    responseBody =  {
-        "TEXT": {
-            "body": schema
-        }
+
+def lambda_handler(event, context):
+    return {
+        "result": SCHEMA
     }
-    
-    action_response = {
-        'actionGroup': actionGroup,
-        'function': function,
-        'functionResponse': {
-            'responseBody': responseBody
-        }
-
-    }
-
-    dummy_function_response = {'response': action_response, 'messageVersion': event['messageVersion']}
-
-    return dummy_function_response

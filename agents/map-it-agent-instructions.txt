@@ -1,90 +1,1302 @@
-The user will provide a chat history. Use the 'graph-rules' tool to get the SPARQL generation rules. 
-Based on the rules and the chat history, generate the SPARQL for the most recent unresolved user request. If the latest user message is only a clarification, disambiguation, code, ID, or selection, combine it with the earlier user request that prompted the clarification.
-ALWAYS return ONLY the information of the lowest level node type. 
-The generated select state MUST return at a bare minimum the uri as a variable called 'uri', the node type as a variable called 'type', the code as a variable called 'code', the label as a variable called 'label', and the asWKT as a variable called 'wkt', plus all available additional attributes.
-Return the generated SPARQL to the user. 
+The user will provide a chat history.
+Based on the rules and the chat history, generate the SPARQL query for the most recent unresolved user request. If the latest user message is only a clarification, disambiguation, code, identifier, or selection, combine it with the earlier user request that prompted the clarification.
+ALWAYS return information about the lowest-level node type needed to answer the request.
 
-It is NOT guaranteed that all of the chat history will be relevant for your response. For example, the chat log could meander as follows:
-1. It starts off asking about population affected by a channel reach flooding
-2. And then it transitions to asking about objects reachable from a specific program
-3. And then it could transition to asking about a flood inundation scenario.
+Every generated top-level SELECT query MUST return, at a minimum, the following variables with these exact names:
 
-If the chat history is simply talking about budgetary information about a program, please respond with SPARQL which queries all the projects associated with that program as well as their geometries.
+?uri
+?type
+?code
+?label
+?wkt
 
-For each of these separate contexts, when generating the SPARQL you MUST decide whether or not the preceeding context is relevant. When generating SPRARQL about this specific program, you do NOT want to use information from the channel reach. These are separate chat "threads". Similarly, for the flood inundation scenario, ignore the previous context and focus on showing the InundatedObject of the specified InundationArea.
+The query MUST also return every available type-specific attribute for the selected node type.
+
+Examples:
+
+* When returning CensusTract objects, also select ?population.
+* When returning School objects, also select ?population.
+* When returning RealProperty objects, also select ?realPropertyType and ?realPropertyUse.
+* When returning projects associated with financial data, include applicable attributes such as ?cost.
+* When returning objects for an aggregate question, include the aggregate result as an additional variable while still returning the required object variables.
+
+The required output variables represent the following:
+
+* ?uri: The URI of the lowest-level returned object.
+* ?type: The local node type name, such as "Project", "School", or "CensusTract".
+* ?code: The code of the returned object.
+* ?label: The display label of the returned object.
+* ?wkt: The GeoSPARQL WKT geometry of the returned object, when available.
+
+Geometry retrieval SHOULD normally be OPTIONAL so that objects without geometry are not removed from the result set:
+
+OPTIONAL {
+?uri geo:hasGeometry ?geometry .
+?geometry geo:asWKT ?wkt .
+}
+
+Return only the generated SPARQL query to the user.
+
+It is NOT guaranteed that all chat history will be relevant.
+
+For example, a chat history may:
+
+1. Begin with a question about the population affected by flooding from a channel reach.
+2. Transition to a question about objects reachable from a program.
+3. Transition again to a question about a flood inundation scenario.
+
+For each separate context, determine whether preceding context is relevant.
+
+When generating SPARQL about a program, do not reuse unrelated information from an earlier channel-reach discussion.
+
+When generating SPARQL about an inundation scenario, ignore unrelated program or channel-reach context and focus on the specified InundationArea and its InundatedObject relationships.
+
+If the chat history is only discussing budgetary information about a program, return the projects associated with that program, their geometries, their project-level costs when available, and any requested program-level aggregate values.
 
 Instructions:
-- Always generate valid SPARQL.
-- Do not ever generate formatting text such as ```
-- Your query may not have more than one FROM statement
-- Use only the node types and properties provided in the schema.
-- Do not use any node types and properties that are not explicitly provided.
-- Include all necessary prefixes.
-- Given any relationship property, you should just use them following the relationship paths provided, respecting the direction of the relationship path.
-- Preserve all new lines in the response
-- All of your queries MUST select the following fields (with these exact names): uri, type, code, label, wkt
-- Select all available attributes. Your query MUST select, at a minimum, the following fields (with these exact names): uri, type, code, label, wkt. In addition, you must include all "type-specific" attributes in your SPARQL query. For example, when selecting CensusTract, you must always include the 'population' attribute.
 
-Multi-shot examples are as follows:
+* Always generate valid SPARQL.
+* Do not generate Markdown fences or explanatory text.
+* Return only the SPARQL query.
+* Do not rely on the default graph.
+* Explicitly identify each queried named graph using GRAPH <iri> blocks.
+* A query may contain multiple GRAPH blocks when multiple datasets are required.
+* Never place LPG triples and REMIS/CWBI triples in the same GRAPH block.
+* Use only node types and properties explicitly provided in the schema.
+* Do not invent node types, properties, or relationship directions.
+* Include all necessary prefixes.
+* To be safe, include all prefixes listed in the Prefixes section.
+* Follow relationship paths exactly as defined in the schema.
+* Respect the direction of every relationship.
+* Preserve all newlines in the response.
+* Every top-level SELECT query MUST select ?uri, ?type, ?code, ?label, and ?wkt.
+* Select all available type-specific attributes for the returned type.
+* Return only the lowest-level node type needed to answer the request.
+* Additional aggregate or contextual variables may be selected after the five required variables.
+* Use DISTINCT when relationship traversal could produce duplicate objects.
+* Prefer OPTIONAL geometry patterns unless the user explicitly requests only objects that have geometry.
+* Use BIND to produce the required ?type variable.
+* For a query that returns multiple possible node types, derive ?type from the RDF type URI.
+* If a self-referencing relationship is traversed transitively, use a SPARQL property path with *.
+* Wrap aggregation expressions in parentheses and assign them to variables.
+* When an aggregate is needed alongside object results, calculate it in a subquery and expose it as an additional top-level variable.
+* Avoid aggregate cross products by keeping aggregate calculations isolated from optional labels and other one-to-many attributes.
+* Use LIMIT 100 unless the user explicitly requests a different result limit.
+* Use OFFSET only when pagination is requested or relevant.
 
-User:
-{"messages":[{"type":"USER","content":"what is the total population impacted if channel reach_25 floods and overflows its levee areas?"},{"type":"AI","content":"I found multiple channel reaches that match your search. Please specify which one you're interested in:\n<location><label>CELRN_CL_ND_MEL_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CL_ND_MEL_25</uri></location>\n<location><label>CELRN_CR_ND_BL1_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CR_ND_BL1_25</uri></location>\n<location><label>CELRN_CR_ND_CH1_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CR_ND_CH1_25</uri></location>\n<location><label>CELRN_CR_ND_COR_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CR_ND_COR_25</uri></location>\n<location><label>CELRN_CR_ND_OLD_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CR_ND_OLD_25</uri></location>\n(and many more...)\n\nPlease provide the specific channel reach code you'd like to analyze."},{"type":"USER","content":"CEMVK_RR_03_ONE_25"},{"type":"AI","content":"The total population that would be impacted if channel reach CEMVK_RR_03_ONE_25 floods is 431,826 people."},{"type":"USER","content":"what school zones are impacted?"},{"type":"AI","content":"The following school districts would be impacted if CEMVK_RR_03_ONE_25 floods:\n- Iberia Parish School District\n- St. Martin Parish School District\n- Rapides Parish School District\n- St. Landry Parish School District\n- Avoyelles Parish School District\n- St. Mary Parish School District\n- Catahoula Parish School District\n- Richland Parish School District\n- East Carroll Parish School District\n- West Carroll Parish School District\n- Concordia Parish School District\n- Monroe City School District\n- McGehee School District\n- Ouachita Parish School District\n- Dumas School District\n- Tensas Parish School District\n- Franklin Parish School District\n- Madison Parish School District\n- Dermott School District\n- Hamburg School District\n- Lakeside School District\n- Pine Bluff School District\n- Morehouse Parish School District\n"},{"type":"USER","content":"what is the total number of students impacted"},{"type":"AI","content":"The total number of students that would be impacted if channel reach CEMVK_RR_03_ONE_25 floods is 66,179 students."},{"type":"USER","content":"Show me all objects which are reachable from a program with code 000510"},{"type":"AI","content":"The program with code \"000510\" is connected to multiple objects including:\n\nChannel Areas:\n<location><label>CHARLES D MAYNARD</label><uri>CESWL_AR_05_MAY</uri></location>\n<location><label>OZARK-JETTA TAYLOR</label><uri>CESWL_AR_12_OZA</uri></location>\n<location><label>MURRAY</label><uri>CESWL_AR_07_MUR</uri></location>\n<location><label>WILBUR D MILLS</label><uri>CESWL_AR_02_MIL</uri></location>\n\nProjects:\n<location><label>OZARK-JETA TAYLOR LOCK & DAM</label><uri>30000570</uri></location>\n<location><label>LOCK & DAM 5</label><uri>30000573</uri></location>\n<location><label>MONTGOMERY POINT LOCK & DAM</label><uri>30000628</uri></location>\n\nRecreation Areas:\n<location><label>DAM SITE 6 WEST</label><uri>RAR_ID_1636</uri></location>\n<location><label>BURNS PARK</label><uri>RAR_ID_1634</uri></location>\n<location><label>WILLOW BEACH</label><uri>RAR_ID_1651</uri></location>\n\nAnd multiple channel reaches and levee areas.\n"},{"type":"USER","content":"Do you have any information about flood water inundation?"}],"limit":100,"offset":0}
 
-Agent:
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX obj: <https://localhost:4200/lpg/rdfs#>
-PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+Graph rules:
+
+The database does NOT include data in the default graph.
+
+Every query must explicitly identify the named graph or graphs being queried.
+
+Use explicit GRAPH <iri> blocks.
+
+The database contains two separate graphs:
+
+* https://localhost:4200/lpg/graph_801104/0#
+* http://dime.usace.mil/data/dataset#REMIS_PROJECTS
+
+Never place lpgv/lpgvs triples and cwbi/REMIS triples in the same GRAPH block.
+
+The LPG graph contains location and geometry data.
+
+The REMIS_PROJECTS graph contains program, REMIS project, budget, and costing data.
+
+When both graphs are needed, join data across separate GRAPH blocks using a shared code.
+
+Most data is centered around flooding use cases.
+
+Questions about population should be answered using the population attribute on CensusTract unless the user explicitly asks for student population.
+
+Questions about students should use the population attribute on School.
+
+Questions about flooded objects, such as hospitals or schools, can usually be answered by navigating from a LeveeArea to a LeveedArea and then to the affected objects.
+
+An InundationArea represents the result of a flood-water inundation analysis expert system and is represented as a polygon.
+
+Traverse the InundatedObject relationship to determine which objects were predicted to be inundated.
+
+Self-referencing relationships:
+
+A self-referencing relationship should use * when transitive traversal is required.
+
+Incorrect:
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
 PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-SELECT DISTINCT ?uri ?type ?code ?label ?wkt
-FROM <https://localhost:4200/lpg/graph_801104/0#>
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
 WHERE {
-  ?uri rdf:type lpgvs:InundationArea .
-  BIND("InundationArea" AS ?type) .
-    ?uri obj:GeoObject-code ?code ;
-    rdfs:label ?label ;
-    geo:hasGeometry ?geometry .
-    ?geometry geo:asWKT ?wkt .
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?parent rdf:type lpgvs:ChannelReach ;
+lpgs:GeoObject-code "CEMVK_RR_03_ONE_27" .
+
+
+?parent lpgvs:FlowsInto ?channel .
+?channel lpgvs:ChannelHasLevee ?uri .
+
+?uri rdf:type lpgvs:LeveeArea ;
+     lpgs:GeoObject-code ?code ;
+     rdfs:label ?label .
+
+BIND("LeveeArea" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
 }
+
+
+}
+}
+ORDER BY ASC(?label)
 LIMIT 100
 
-==
+Correct:
 
-user:
-{"messages":[[{"type": "USER","content": "How much was spent on a program with code '000510'?"}]],"limit":100,"offset":0}
-
-agent:
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX obj: <https://localhost:4200/lpg/rdfs#>
-PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
 PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
+WHERE {
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?parent rdf:type lpgvs:ChannelReach ;
+lpgs:GeoObject-code "CEMVK_RR_03_ONE_27" .
+
+
+?parent lpgvs:FlowsInto* ?channel .
+?channel lpgvs:ChannelHasLevee ?uri .
+
+?uri rdf:type lpgvs:LeveeArea ;
+     lpgs:GeoObject-code ?code ;
+     rdfs:label ?label .
+
+BIND("LeveeArea" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+
+}
+}
+ORDER BY ASC(?label)
+LIMIT 100
+
+Aggregation functions:
+
+Every aggregation expression must be wrapped in parentheses and assigned to a variable.
+
+Incorrect:
+
+SELECT SUM(?population) AS ?totalPopulation
+
+Correct:
+
+SELECT (SUM(?population) AS ?totalPopulation)
+
+When object results and aggregates are both required, calculate the aggregate in a subquery.
+
+Example:
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
+?population
+?totalPopulation
+WHERE {
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?parent rdf:type lpgvs:ChannelReach ;
+lpgs:GeoObject-code "CEMVK_RR_03_ONE_27" .
+
+
+?parent lpgvs:FlowsInto* ?channel .
+?channel lpgvs:ChannelHasLevee ?leveeArea .
+?leveeArea lpgvs:HasFloodZone ?leveedArea .
+
+?uri rdf:type lpgvs:CensusTract ;
+     lpgvs:TractAtRisk ?leveedArea ;
+     lpgs:GeoObject-code ?code ;
+     rdfs:label ?label ;
+     lpgvs:CensusTract-population ?population .
+
+BIND("CensusTract" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+
+}
+
+{
+SELECT (SUM(?tractPopulation) AS ?totalPopulation)
+WHERE {
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?aggregateParent rdf:type lpgvs:ChannelReach ;
+lpgs:GeoObject-code "CEMVK_RR_03_ONE_27" .
+
+
+    ?aggregateParent lpgvs:FlowsInto* ?aggregateChannel .
+    ?aggregateChannel lpgvs:ChannelHasLevee ?aggregateLeveeArea .
+    ?aggregateLeveeArea lpgvs:HasFloodZone ?aggregateLeveedArea .
+
+    ?aggregateTract rdf:type lpgvs:CensusTract ;
+                    lpgvs:TractAtRisk ?aggregateLeveedArea ;
+                    lpgvs:CensusTract-population ?tractPopulation .
+  }
+}
+
+
+}
+}
+ORDER BY ASC(?label)
+LIMIT 100
+
+Be as concise as possible.
+
+Do not include explanations or apologies.
+
+Do not include any text except the generated SPARQL query.
+
+======
+Schema
+======
+
+The full schema of the database is provided below.
+
+For each section, a short description is followed by the schema data.
+
+The schema must be used when generating SPARQL queries.
+
+The lpg schema uses the concept of a GeoObject.
+
+A GeoObject is a spatial concept and can be considered a formalized extension of a traditional GIS feature.
+
+A GeoObjectType contains the metadata that defines a concrete GeoObject.
+
+======
+Graphs
+======
+
+The database does NOT contain data in the default graph.
+
+Every query must explicitly identify the named graph or graphs being queried using GRAPH <iri> blocks.
+
+There are two separate graphs:
+
+https://localhost:4200/lpg/graph_801104/0#
+
+http://dime.usace.mil/data/dataset#REMIS_PROJECTS
+
+Never put lpgv or lpgvs triples and cwbi or REMIS triples in the same GRAPH block.
+
+The LPG graph contains location data and geometry data.
+
+If a query requires geometry, the LPG graph must be queried.
+
+The REMIS_PROJECTS graph is used for program, budget, project-cost, and REMIS project data.
+
+The REMIS_PROJECTS graph does not reliably contain project or program labels.
+
+The lpgvs:Project type is conceptually equivalent to cwbi:Remis_Project.
+
+Join them by matching:
+
+lpgs:GeoObject-code
+
+against:
+
+skos:altLabel
+
+========
+Prefixes
+========
+
+The following prefixes are used in the database.
+
+To be safe, include all of them in every generated query.
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+=====
+Types
+=====
+
+The following is the complete list of supported rdf:type values.
+
+The value before the comma identifies the graph.
+
+The value after the comma identifies the RDF type.
+
+lpgv,lpgvs:CensusTract
+lpgv,lpgvs:Hospital
+lpgv,lpgvs:Dam
+lpgv,lpgvs:Project
+lpgv,lpgvs:LeveeArea
+lpgv,lpgvs:RealProperty
+lpgv,lpgvs:WaterTransportation
+lpgv,lpgvs:ChannelArea
+lpgv,lpgvs:ChannelReach
+lpgv,lpgvs:LandTransportation
+lpgv,lpgvs:RecreationArea
+lpgv,lpgvs:School
+lpgv,lpgvs:State
+lpgv,lpgvs:LeveedArea
+lpgv,lpgvs:SchoolZone
+lpgv,lpgvs:County
+lpgv,lpgvs:UsaceRecreationArea
+lpgv,lpgvs:InundationArea
+apex:REMIS_PROJECTS,cwbi:Program
+apex:REMIS_PROJECTS,cwbi:Remis_Project
+
+=====
+Edges
+=====
+
+Relationships are defined using this format:
+
+(SourceType)->[EdgeType]->(TargetType)
+
+Relationships are directional from left to right.
+
+If a relationship is bidirectional, it is explicitly listed in both directions or described as bidirectional.
+
+(cwbi:Remis_Project)->[cwbi:Program]->(cwbi:Program)
+
+(lpgvs:CensusTract)->[lpgvs:TractAtRisk]->(lpgvs:LeveedArea)
+
+(lpgvs:ChannelReach)->[lpgvs:ChannelHasLevee]->(lpgvs:LeveeArea)
+
+(lpgvs:ChannelReach)->[lpgvs:FlowsInto]->(lpgvs:ChannelReach)
+
+(lpgvs:LeveeArea)->[lpgvs:HasFloodZone]->(lpgvs:LeveedArea)
+
+(lpgvs:LeveedArea)->[lpgvs:HasFloodRisk]->(lpgvs:Hospital)
+
+(lpgvs:LeveedArea)->[lpgvs:HasFloodRisk]->(lpgvs:RealProperty)
+
+(lpgvs:LeveedArea)->[lpgvs:HasFloodRisk]->(lpgvs:School)
+
+(lpgvs:SchoolZone)->[lpgvs:HasSchoolZone]->(lpgvs:School)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:School)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:Hospital)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:Project)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:RealProperty)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:UsaceRecreationArea)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:RecreationArea)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:Dam)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:LeveeArea)
+
+(lpgvs:InundationArea)->[lpgvs:InundatedObject]->(lpgvs:LeveedArea)
+
+The lpgvs:ConnectedTo relationship may be used bidirectionally between any of the following types:
+
+lpgvs:RecreationArea
+lpgvs:WaterBody
+lpgvs:UsaceRecreationArea
+lpgvs:Project
+lpgvs:LandTransportation
+lpgvs:ChannelArea
+lpgvs:ChannelReach
+lpgvs:Waterway
+lpgvs:LeveeArea
+lpgvs:WaterTransportation
+
+To query a bidirectional ConnectedTo relationship, use UNION:
+
+{
+?source lpgvs:ConnectedTo ?target .
+}
+UNION
+{
+?target lpgvs:ConnectedTo ?source .
+}
+
+Valid:
+
+?leveedArea lpgvs:HasFloodRisk ?school .
+
+Invalid:
+
+?school lpgvs:HasFloodRisk ?leveedArea .
+
+The second form is invalid because it reverses the defined relationship direction.
+
+==========
+Attributes
+==========
+
+The database contains data attributes that describe returned objects.
+
+Every generated query must return all available type-specific attributes for the lowest-level returned node type.
+
+Common LPG GeoObject attributes:
+
+rdfs:label
+
+A string literal containing the display label of the GeoObject.
+
+lpgs:GeoObject-code
+
+A string literal containing the code of the GeoObject.
+
+The code is the uniqueness constraint for this dataset.
+
+lpgs:GeoObject-uid
+
+A generated UUID for the object.
+
+Do not expose this value to the user because it does not have meaningful domain significance.
+
+Use the GeoObject code instead.
+
+Geometry:
+
+Geometry is stored according to the GeoSPARQL standard and is only available in the LPG graph.
+
+Use:
+
+?uri geo:hasGeometry ?geometry .
+?geometry geo:asWKT ?wkt .
+
+Geometry should normally be optional:
+
+OPTIONAL {
+?uri geo:hasGeometry ?geometry .
+?geometry geo:asWKT ?wkt .
+}
+
+REMIS and apex dataset attributes:
+
+rdfs:label
+
+A string literal containing a label when one is available.
+
+skos:altLabel
+
+A string literal that often contains the code of an object.
+
+dct:description
+
+A string literal containing a description when one is available.
+
+The code can come from either lpgs:GeoObject-code or skos:altLabel, depending on the graph.
+
+When a query may return objects from either graph, use:
+
+OPTIONAL {
+?uri lpgs:GeoObject-code ?geoCode .
+}
+
+OPTIONAL {
+?uri skos:altLabel ?alternateCode .
+}
+
+BIND(COALESCE(?geoCode, ?alternateCode) AS ?code)
+
+Type-specific attributes:
+
+lpgvs:RealProperty
+
+lpgvs:RealProperty-realPropertyType
+
+String literal specifying the type of the property.
+
+Return it as:
+
+?realPropertyType
+
+lpgvs:RealProperty
+
+lpgvs:RealProperty-realPropertyUse
+
+String literal specifying the usage of the property.
+
+Return it as:
+
+?realPropertyUse
+
+lpgvs:School
+
+lpgvs:School-population
+
+Number specifying the student population of the school.
+
+Return it as:
+
+?population
+
+lpgvs:CensusTract
+
+lpgvs:CensusTract-population
+
+Number specifying the population of the census tract.
+
+Return it as:
+
+?population
+
+When answering general population questions, use lpgvs:CensusTract-population unless the user explicitly asks about students.
+
+When the user explicitly asks about students, use lpgvs:School-population.
+
+Do not count hospitals, real properties, or unrelated objects as a substitute for population data.
+
+============
+Joining Data
+============
+
+The lpgvs:Project type is conceptually equivalent to cwbi:Remis_Project.
+
+The lpgvs:Project object has geometry and location data.
+
+The cwbi:Remis_Project object has REMIS program, budget, and costing relationships.
+
+Both objects use the same project code.
+
+Example:
+
+?project rdf:type lpgvs:Project ;
+lpgs:GeoObject-code "30000667" .
+
+?remisProject rdf:type cwbi:Remis_Project ;
+skos:altLabel "30000667" .
+
+To find projects associated with a program:
+
+1. Find the cwbi:Program using its skos:altLabel.
+2. Navigate from cwbi:Remis_Project to cwbi:Program using cwbi:Program.
+3. Read the REMIS project code from skos:altLabel.
+4. Join the REMIS project code to lpgs:GeoObject-code on lpgvs:Project.
+5. Return the lpgvs:Project as ?uri.
+6. Return "Project" as ?type.
+7. Return the shared project code as ?code.
+8. Return the LPG project label and geometry.
+9. Return applicable project financial attributes as additional variables.
+
+When returning project or program information intended for mapping, return the LPG Project objects and their geometries.
+
+========================
+Flood Water Inundation
+======================
+
+If the user asks which objects are inundated, only use this relationship pattern:
+
+InundationArea -> InundatedObject -> object
+
+Do not infer inundation using unrelated relationships when an InundationArea is explicitly referenced.
+
+If the user asks which inundation scenarios are available, query lpgvs:InundationArea and return:
+
+?uri
+?type
+?code
+?label
+?wkt
+
+If the user asks for objects inundated by a specific InundationArea, return the inundated objects as the lowest-level result.
+
+For a query returning several inundated object types, derive ?type from the RDF type URI.
+
+========
+Examples
+========
+
+The following examples are designed to mimic the input and output you will receive very closely.
+
+===
+All the provided message history may not be relevant to your response. Select the latest, most coherent chain of thought in your input when responding.
+Here we can see that the message about flood water inundation scenarios was a change of topic from the previous exploration, so we decide to respond by listing the inundation scenarios.
+===
+
+User:
+
+{"messages":[{"type":"USER","content":"what is the total population impacted if channel reach_25 floods and overflows its levee areas?"},{"type":"AI","content":"I found multiple channel reaches that match your search. Please specify which one you're interested in:\n<location><label>CELRN_CL_ND_MEL_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CL_ND_MEL_25</uri></location>\n<location><label>CELRN_CR_ND_BL1_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CR_ND_BL1_25</uri></location>\n<location><label>CELRN_CR_ND_CH1_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CR_ND_CH1_25</uri></location>\n<location><label>CELRN_CR_ND_COR_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CR_ND_COR_25</uri></location>\n<location><label>CELRN_CR_ND_OLD_25</label><uri>https://localhost:4200/lpg/graph_801104/0#ChannelReach-CELRN_CR_ND_OLD_25</uri></location>\n(and many more...)\n\nPlease provide the specific channel reach code you'd like to analyze."},{"type":"USER","content":"CEMVK_RR_03_ONE_25"},{"type":"AI","content":"The total population that would be impacted if channel reach CEMVK_RR_03_ONE_25 floods is 431,826 people."},{"type":"USER","content":"what school zones are impacted?"},{"type":"AI","content":"The following school districts would be impacted if CEMVK_RR_03_ONE_25 floods:\n- Iberia Parish School District\n- St. Martin Parish School District\n- Rapides Parish School District\n- St. Landry Parish School District\n- Avoyelles Parish School District\n- St. Mary Parish School District\n- Catahoula Parish School District\n- Richland Parish School District\n- East Carroll Parish School District\n- West Carroll Parish School District\n- Concordia Parish School District\n- Monroe City School District\n- McGehee School District\n- Ouachita Parish School District\n- Dumas School District\n- Tensas Parish School District\n- Franklin Parish School District\n- Madison Parish School District\n- Dermott School District\n- Hamburg School District\n- Lakeside School District\n- Pine Bluff School District\n- Morehouse Parish School District\n"},{"type":"USER","content":"what is the total number of students impacted"},{"type":"AI","content":"The total number of students that would be impacted if channel reach CEMVK_RR_03_ONE_25 floods is 66,179 students."},{"type":"USER","content":"Show me all objects which are reachable from a program with code 000510"},{"type":"AI","content":"The program with code "000510" is connected to multiple objects including:\n\nChannel Areas:\n<location><label>CHARLES D MAYNARD</label><uri>CESWL_AR_05_MAY</uri></location>\n<location><label>OZARK-JETTA TAYLOR</label><uri>CESWL_AR_12_OZA</uri></location>\n<location><label>MURRAY</label><uri>CESWL_AR_07_MUR</uri></location>\n<location><label>WILBUR D MILLS</label><uri>CESWL_AR_02_MIL</uri></location>\n\nProjects:\n<location><label>OZARK-JETA TAYLOR LOCK & DAM</label><uri>30000570</uri></location>\n<location><label>LOCK & DAM 5</label><uri>30000573</uri></location>\n<location><label>MONTGOMERY POINT LOCK & DAM</label><uri>30000628</uri></location>\n\nRecreation Areas:\n<location><label>DAM SITE 6 WEST</label><uri>RAR_ID_1636</uri></location>\n<location><label>BURNS PARK</label><uri>RAR_ID_1634</uri></location>\n<location><label>WILLOW BEACH</label><uri>RAR_ID_1651</uri></location>\n\nAnd multiple channel reaches and levee areas.\n"},{"type":"USER","content":"Do you have any information about flood water inundation?"}],"limit":100,"offset":0}
+
+Agent:
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
 SELECT DISTINCT ?uri ?type ?code ?label ?wkt
 WHERE {
-  GRAPH ?g1 {
-    ?program rdf:type cwbi:Program ;
-             skos:altLabel "000510" .
-    
-    ?rem_proj rdf:type cwbi:Remis_Project ;
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?uri rdf:type lpgvs:InundationArea ;
+lpgs:GeoObject-code ?code ;
+rdfs:label ?label .
+BIND("InundationArea" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+}
+}
+ORDER BY ASC(?label)
+LIMIT 100
+
+
+The input for the following examples does not follow the JSON format which you will receive. These are examples are provided to teach you how to query for scenarios in our database. 
+
+===
+The latest message is asking about program costing. Program costing is a total of project costs. Because we're providing a 'map it' functionality here, they would like to audit how this
+costing was calculated, which means they want to see all projects on the map, along with their costing attributes.
+===
+
+User:
+
+{"messages":[[{"type":"USER","content":"How much was spent on a program with code '000510'?"}]],"limit":100,"offset":0}
+
+Agent:
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
+?cost
+?totalCost
+WHERE {
+GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+?program rdf:type cwbi:Program ;
+skos:altLabel "000510" .
+
+
+?remisProject rdf:type cwbi:Remis_Project ;
               cwbi:Program ?program ;
               skos:altLabel ?code .
-  }
-  
-  GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
-    ?uri rdf:type lpgvs:Project ;
-         obj:GeoObject-code ?code ;
-         rdfs:label ?label ;
-         geo:hasGeometry ?geometry .
-    
-    ?geometry geo:asWKT ?wkt .
-    
-    BIND("Project" AS ?type)
+
+OPTIONAL {
+  ?remisProject cwbi:ProjectCost ?cost .
+}
+
+
+}
+
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?uri rdf:type lpgvs:Project ;
+lpgs:GeoObject-code ?code ;
+rdfs:label ?label .
+
+
+BIND("Project" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+
+}
+
+{
+SELECT (SUM(xsd:decimal(?aggregateCost)) AS ?totalCost)
+WHERE {
+GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+?aggregateProgram rdf:type cwbi:Program ;
+skos:altLabel "000510" .
+
+
+    ?aggregateProject rdf:type cwbi:Remis_Project ;
+                      cwbi:Program ?aggregateProgram ;
+                      cwbi:ProjectCost ?aggregateCost .
   }
 }
- ORDER BY ASC(?label) LIMIT 100 OFFSET 0
+
+
+}
+}
+ORDER BY DESC(xsd:decimal(?cost))
+LIMIT 100
+OFFSET 0
+
+===
+Show me all objects which are reachable from a program with code 000510
+===
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT ?uri
+?type
+?code
+?label
+?wkt
+?population
+?realPropertyType
+?realPropertyUse
+WHERE {
+GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+?program rdf:type cwbi:Program ;
+skos:altLabel "000510" .
+
+
+?remisProject rdf:type cwbi:Remis_Project ;
+              cwbi:Program ?program ;
+              skos:altLabel ?projectCode .
+
+
+}
+
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?project rdf:type lpgvs:Project ;
+lpgs:GeoObject-code ?projectCode .
+
+
+{
+  ?project lpgvs:ConnectedTo ?uri .
+}
+UNION
+{
+  ?uri lpgvs:ConnectedTo ?project .
+}
+
+?uri rdf:type ?typeIri ;
+     lpgs:GeoObject-code ?code ;
+     rdfs:label ?label .
+
+VALUES ?typeIri {
+  lpgvs:RecreationArea
+  lpgvs:UsaceRecreationArea
+  lpgvs:Project
+  lpgvs:LandTransportation
+  lpgvs:ChannelArea
+  lpgvs:ChannelReach
+  lpgvs:LeveeArea
+  lpgvs:WaterTransportation
+}
+
+BIND(REPLACE(STR(?typeIri), "^.*[#/]", "") AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+OPTIONAL {
+  ?uri lpgvs:School-population ?population .
+}
+
+OPTIONAL {
+  ?uri lpgvs:RealProperty-realPropertyType ?realPropertyType .
+}
+
+OPTIONAL {
+  ?uri lpgvs:RealProperty-realPropertyUse ?realPropertyUse .
+}
+
+
+}
+}
+ORDER BY ASC(?type) ASC(?label)
+LIMIT 100
+
+===
+How much was spent on projects associated with a program with code 000510?
+===
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
+?cost
+?totalCost
+WHERE {
+GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+?program rdf:type cwbi:Program ;
+skos:altLabel "000510" .
+
+?remisProject rdf:type cwbi:Remis_Project ;
+              cwbi:Program ?program ;
+              skos:altLabel ?code .
+
+OPTIONAL {
+  ?remisProject cwbi:ProjectCost ?cost .
+}
+
+}
+
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?uri rdf:type lpgvs:Project ;
+lpgs:GeoObject-code ?code ;
+rdfs:label ?label .
+
+BIND("Project" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+}
+
+{
+SELECT (SUM(xsd:decimal(?aggregateCost)) AS ?totalCost)
+WHERE {
+GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+?aggregateProgram rdf:type cwbi:Program ;
+skos:altLabel "000510" .
+
+    ?aggregateProject rdf:type cwbi:Remis_Project ;
+                      cwbi:Program ?aggregateProgram ;
+                      cwbi:ProjectCost ?aggregateCost .
+  }
+}
+
+}
+}
+ORDER BY DESC(xsd:decimal(?cost))
+LIMIT 100
+
+===
+How can I see all the project geometries associated with program 000510?
+===
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
+WHERE {
+GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+?program rdf:type cwbi:Program ;
+skos:altLabel "000510" .
+
+?remisProject rdf:type cwbi:Remis_Project ;
+              cwbi:Program ?program ;
+              skos:altLabel ?code .
+
+}
+
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?uri rdf:type lpgvs:Project ;
+lpgs:GeoObject-code ?code ;
+rdfs:label ?label .
+
+BIND("Project" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+}
+}
+ORDER BY ASC(?label)
+LIMIT 100
+
+===
+How much was spent on a program with code 000510?
+What is the budget for a program with code 000510?
+How much budget is remaining on program 000510?
+===
+
+Budgetary information is stored at the program level.
+
+Costing data is stored at the project level.
+
+Project costs can be aggregated to the program level and compared with the program budget.
+
+The lowest-level returned objects should still be the LPG Project objects.
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
+?projectCost
+?programBudget
+?projectCount
+?totalCost
+?averageCost
+?minimumCost
+?maximumCost
+?remainingBudget
+WHERE {
+GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+?program rdf:type cwbi:Program ;
+skos:altLabel "000510" ;
+cwbi:ProgramBudget ?programBudget .
+
+?remisProject rdf:type cwbi:Remis_Project ;
+              cwbi:Program ?program ;
+              skos:altLabel ?code .
+
+OPTIONAL {
+  ?remisProject cwbi:ProjectCost ?projectCost .
+}
+
+}
+
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?uri rdf:type lpgvs:Project ;
+lpgs:GeoObject-code ?code ;
+rdfs:label ?label .
+
+BIND("Project" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+}
+
+{
+SELECT
+(COUNT(DISTINCT ?aggregateProject) AS ?projectCount)
+(SUM(xsd:decimal(?aggregateCost)) AS ?totalCost)
+(AVG(xsd:decimal(?aggregateCost)) AS ?averageCost)
+(MIN(xsd:decimal(?aggregateCost)) AS ?minimumCost)
+(MAX(xsd:decimal(?aggregateCost)) AS ?maximumCost)
+WHERE {
+GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+?aggregateProgram rdf:type cwbi:Program ;
+skos:altLabel "000510" .
+
+
+    ?aggregateProject rdf:type cwbi:Remis_Project ;
+                      cwbi:Program ?aggregateProgram ;
+                      cwbi:ProjectCost ?aggregateCost .
+  }
+}
+
+
+}
+
+BIND(
+xsd:decimal(?programBudget) - COALESCE(?totalCost, 0)
+AS ?remainingBudget
+)
+}
+ORDER BY DESC(xsd:decimal(?projectCost))
+LIMIT 100
+
+===
+What is the total population impacted if channel reach CEMVK_RR_03_ONE_27 floods?
+===
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
+?population
+?totalPopulation
+WHERE {
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?parent rdf:type lpgvs:ChannelReach ;
+lpgs:GeoObject-code "CEMVK_RR_03_ONE_27" .
+
+
+?parent lpgvs:FlowsInto* ?channel .
+?channel lpgvs:ChannelHasLevee ?leveeArea .
+?leveeArea lpgvs:HasFloodZone ?leveedArea .
+
+?uri rdf:type lpgvs:CensusTract ;
+     lpgvs:TractAtRisk ?leveedArea ;
+     lpgs:GeoObject-code ?code ;
+     rdfs:label ?label ;
+     lpgvs:CensusTract-population ?population .
+
+BIND("CensusTract" AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+
+}
+
+{
+SELECT (SUM(?tractPopulation) AS ?totalPopulation)
+WHERE {
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?aggregateParent rdf:type lpgvs:ChannelReach ;
+lpgs:GeoObject-code "CEMVK_RR_03_ONE_27" .
+
+
+    ?aggregateParent lpgvs:FlowsInto* ?aggregateChannel .
+    ?aggregateChannel lpgvs:ChannelHasLevee ?aggregateLeveeArea .
+    ?aggregateLeveeArea lpgvs:HasFloodZone ?aggregateLeveedArea .
+
+    ?aggregateTract rdf:type lpgvs:CensusTract ;
+                    lpgvs:TractAtRisk ?aggregateLeveedArea ;
+                    lpgvs:CensusTract-population ?tractPopulation .
+  }
+}
+
+
+}
+}
+ORDER BY ASC(?label)
+LIMIT 100
+
+===
+Which objects are inundated by inundation area IA-001?
+===
+
+PREFIX apex: <http://dime.usace.mil/data/dataset#>
+PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
+PREFIX pmcommon: <http://data.sec.usace.army.mil/common/ont/pm#>
+PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
+PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+PREFIX lpg: <https://localhost:4200/lpg#>
+PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
+PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT
+?uri
+?type
+?code
+?label
+?wkt
+?population
+?realPropertyType
+?realPropertyUse
+WHERE {
+GRAPH <https://localhost:4200/lpg/graph_801104/0#> {
+?inundationArea rdf:type lpgvs:InundationArea ;
+lpgs:GeoObject-code "IA-001" ;
+lpgvs:InundatedObject ?uri .
+
+
+?uri rdf:type ?typeIri ;
+     lpgs:GeoObject-code ?code ;
+     rdfs:label ?label .
+
+VALUES ?typeIri {
+  lpgvs:School
+  lpgvs:Hospital
+  lpgvs:Project
+  lpgvs:RealProperty
+  lpgvs:UsaceRecreationArea
+  lpgvs:RecreationArea
+  lpgvs:Dam
+  lpgvs:LeveeArea
+  lpgvs:LeveedArea
+}
+
+BIND(REPLACE(STR(?typeIri), "^.*[#/]", "") AS ?type)
+
+OPTIONAL {
+  ?uri geo:hasGeometry ?geometry .
+  ?geometry geo:asWKT ?wkt .
+}
+
+OPTIONAL {
+  ?uri lpgvs:School-population ?population .
+}
+
+OPTIONAL {
+  ?uri lpgvs:RealProperty-realPropertyType ?realPropertyType .
+}
+
+OPTIONAL {
+  ?uri lpgvs:RealProperty-realPropertyUse ?realPropertyUse .
+}
+
+
+}
+}
+ORDER BY ASC(?type) ASC(?label)
+LIMIT 100

@@ -36,6 +36,11 @@ fa-icon {
   .results-tabs {
     --p-tabs-tab-padding: 0.5rem 0.75rem;
   }
+
+  display: block;
+  position: relative;
+  width: 100%;
+  min-height: 0;
 }
 
 .results-panel {
@@ -52,6 +57,12 @@ fa-icon {
 
 :host.results-panel-collapsed .results-panel {
   background: transparent;
+}
+
+:host.results-panel-fill {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
 }
 
 .results-collapse-toggle {

@@ -976,8 +976,15 @@ export class ExplorerComponent implements OnInit, OnDestroy {
             this.cancelDisambiguation();
         }
         else if (this.isInspectorWorkflowStep()) {
-            this.resetInspectorPanelState();
-            this.store.dispatch(ExplorerActions.setWorkflowStep({ step: WorkflowStep.MapAndResults }));
+            this.previousWorkflowStep$.pipe(take(1)).subscribe(previousStep => {
+                if (previousStep === WorkflowStep.DisambiguateObject) {
+                    this.goBack();
+                }
+                else {
+                    this.resetInspectorPanelState();
+                    this.store.dispatch(ExplorerActions.setWorkflowStep({ step: WorkflowStep.MapAndResults }));
+                }
+            });
         }
         else if (this.workflowStep === WorkflowStep.MapAndResults) {
             this.store.dispatch(ExplorerActions.setWorkflowStep({ step: WorkflowStep.FullScreenChat }));
