@@ -35,7 +35,7 @@ public class NeptuneQueryService extends GraphQueryService
         .httpClient(signingClient)
         .destination(properties.getSparqlUrl())
         .queryEndpoint("sparql")
-        .updateEndpoint("sparql");
+        .updateEndpoint("update");
 
     return builder.build();
   }
