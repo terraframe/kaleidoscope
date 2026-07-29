@@ -378,7 +378,7 @@ export class AichatComponent {
 
     const conversation: ChatConversation = {
       id,
-      title: 'Example chat',
+      title: 'New chat',
       sessionId: uuidv4(),
       messages: this.createDefaultMessages(),
       draft: '',
@@ -498,38 +498,9 @@ export class AichatComponent {
   }
 
   private createDefaultMessages(): ChatMessage[] {
-    // return [
-    //   {
-    //     id: uuidv4(),
-    //     sender: 'system',
-    //     text: 'Ask me a question about the map.',
-    //     mappable: false,
-    //     sections: [
-    //       {
-    //         type: 0,
-    //         text: 'Ask me a question about the map.'
-    //       }
-    //     ],
-    //     loading: false,
-    //     purpose: 'info'
-    //   },
-    //   {
-    //     id: uuidv4(),
-    //     sender: 'system',
-    //     text: 'For example: “Show me levees near Denver” or “Find pump stations in this area.”',
-    //     mappable: false,
-    //     sections: [
-    //       {
-    //         type: 0,
-    //         text: 'For example: “Show me levees near Denver” or “Find pump stations in this area.”'
-    //       }
-    //     ],
-    //     loading: false,
-    //     purpose: 'info'
-    //   }
-    // ];
+    // return initialState.messages;
 
-    return initialState.messages;
+    return [];
   }
 
   private updateConversationTitle(conversation: ChatConversation, text: string): void {
