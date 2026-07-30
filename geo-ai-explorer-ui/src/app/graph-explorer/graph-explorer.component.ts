@@ -9,11 +9,11 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import ColorGen from "color-generator";
 import { GeoObject } from '../models/geoobject.model';
 import { Store } from '@ngrx/store';
-import { ExplorerActions, getSelectedObject, getWorkflowState, getWorkflowStep, getZoomMap, highlightedObject, WorkflowState, WorkflowStep } from '../state/explorer.state';
-import { distinctUntilChanged, Observable, Subscription, withLatestFrom } from 'rxjs';
-import { ErrorService } from '../service/error-service.service';
+import { ExplorerActions, getSelectedObject, getStyles, getWorkflowState, getZoomMap, highlightedObject, WorkflowState, WorkflowStep } from '../state/explorer.state';
+import { distinctUntilChanged, Observable, Subscription } from 'rxjs';
 import { CheckboxModule } from 'primeng/checkbox';
 import { FormsModule } from '@angular/forms';
+import { StyleConfig } from '../models/style.model';
 
 
 // export interface Relationship {
@@ -116,6 +116,10 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
 
   zoomMap$: Observable<boolean> = this.store.select(getZoomMap);
 
+  styles$: Observable<StyleConfig> = this.store.select(getStyles);
+
+  onStylesChange: Subscription;
+
   highlightedObject$: Observable<GeoObject | null> = this.store.select(highlightedObject);
 
   onHighlightedObjectChange: Subscription;
@@ -134,19 +138,24 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
 
   public typeLegend: TypeLegend = {};
 
+  private resolvedStyles: StyleConfig = {};
+
   private graphContainer?: ElementRef<HTMLElement>;
   private resizeObserver?: ResizeObserver;
   private resizeRefreshFrame = 0;
 
   constructor(
-    private queryService: ExplorerService,
-    private errorService: ErrorService
+    private queryService: ExplorerService
   ) {
 
     this.onHighlightedObjectChange = this.highlightedObject$.subscribe(object => {
       if (object) {
         this.highlightedObject = object;
       }
+    });
+
+    this.onStylesChange = this.styles$.subscribe(styles => {
+      this.resolvedStyles = styles;
     });
 
     this.onSelectedObjectChange = this.selectedObject$
@@ -192,6 +201,7 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
     }
 
     this.onHighlightedObjectChange.unsubscribe();
+    this.onStylesChange.unsubscribe();
     this.onWorkflowStateChange.unsubscribe();
     this.onSelectedObjectChange.unsubscribe();
   }
@@ -227,7 +237,7 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
       this.renderGraph(graph, true);
 
       // setTimeout(() => { this.zoomToUri(geoObject.properties.uri); }, 500);
-    }).catch(error => { this.errorService.handleError(error); this.loading = false; });
+    }).finally(() => { this.loading = false; });
   }
 
   public renderGraph(graph: GprGraph | null, zoom: boolean = false) {
@@ -294,9 +304,10 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
     this.typeLegend = {};
 
     Object.entries(this.gprGraph!.typeCount).forEach(kv => {
+        const style = this.resolvedStyles[kv[0]];
         this.typeLegend[kv[0]] = {
-            label: this.explorer!.labelForType(kv[0]),
-            color: this.explorer!.resolvedStyles[kv[0]].color,
+            label: style?.label ?? ExplorerComponent.uriToLabel(kv[0]),
+            color: style?.color ?? ColorGen().hexString(),
             visible: (oldTypeLegend[kv[0]] == null ? true : oldTypeLegend[kv[0]].visible),
             included: (oldTypeLegend[kv[0]] == null ? true : oldTypeLegend[kv[0]].included)
         }
