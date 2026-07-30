@@ -57,7 +57,7 @@ public class GraphQueryService
   protected String buildPrefixes()
   {
     return """
-      PREFIX lpg: <%s>
+      PREFIX obj: <%s#>
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
       PREFIX geo: <http://www.opengis.net/ont/geosparql#>
       PREFIX spatialF: <http://jena.apache.org/function/spatial#>
@@ -105,7 +105,7 @@ public class GraphQueryService
   protected String buildNeighborQuery()
   {
     return """
-      PREFIX lpg: <%s>
+      PREFIX obj: <%s#>
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
       PREFIX geo: <http://www.opengis.net/ont/geosparql#>
       PREFIX spatialF: <http://jena.apache.org/function/spatial#>
@@ -124,7 +124,7 @@ public class GraphQueryService
           # Source Object
           ?f1 a ?ft1 .
           ?f1 rdfs:label ?lbl1 .
-          ?f1 lpg:GeoObject-code ?code1 .
+          ?f1 obj:GeoObject-code ?code1 .
 
           OPTIONAL {
               ?f1 geo:hasGeometry ?g1 .
@@ -137,7 +137,7 @@ public class GraphQueryService
               ?f2 a ?ft2 .
               ###TYPE_FILTER_FILTER1###
               ?f2 rdfs:label ?lbl2 .
-              ?f2 lpg:GeoObject-code ?code2 .
+              ?f2 obj:GeoObject-code ?code2 .
 
               BIND(geo:Feature as ?gf2) .
               BIND(?f2 as ?ev1) .
@@ -154,7 +154,7 @@ public class GraphQueryService
               ?f3 a ?ft3 .
               ###TYPE_FILTER_FILTER2###
               ?f3 rdfs:label ?lbl3 .
-              ?f3 lpg:GeoObject-code ?code3 .
+              ?f3 obj:GeoObject-code ?code3 .
 
               BIND(geo:Feature as ?gf3) .
               BIND(?f3 as ?ev2) .
@@ -172,7 +172,7 @@ public class GraphQueryService
   protected String buildNeighborMetadataQuery()
   {
     return """
-      PREFIX lpg: <%s>
+      PREFIX obj: <%s#>
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
       PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 
@@ -183,21 +183,21 @@ public class GraphQueryService
           # Type of source object
           BIND(?uri AS ?obj)
           ?obj a ?type .
-          ?obj lpg:GeoObject-code ?code .
+          ?obj obj:GeoObject-code ?code .
         }
         UNION
         {
           # Outgoing object types
           ?uri ?p1 ?obj .
           ?obj a ?type .
-          ?obj lpg:GeoObject-code ?code .
+          ?obj obj:GeoObject-code ?code .
         }
         UNION
         {
           # Incoming object types
           ?obj ?p2 ?uri .
           ?obj a ?type .
-          ?obj lpg:GeoObject-code ?code .
+          ?obj obj:GeoObject-code ?code .
         }
       }
       GROUP BY ?type
