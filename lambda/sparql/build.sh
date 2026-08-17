@@ -1,7 +1,22 @@
-pip install --target ./package requests
+#!/usr/bin/env bash
+set -euo pipefail
 
-cd package
-zip -r ../function.zip .
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-cd ..
-zip function.zip lambda_function.py
+BUILD_DIR="${ROOT_DIR}/package"
+ZIP_FILE="${ROOT_DIR}/function.zip"
+
+rm -rf "${BUILD_DIR}" "${ZIP_FILE}"
+mkdir -p "${BUILD_DIR}"
+
+python3 -m pip install \
+  --target "${BUILD_DIR}" \
+  requests
+
+cd "${BUILD_DIR}"
+zip -r "${ZIP_FILE}" .
+
+cd "${ROOT_DIR}"
+zip "${ZIP_FILE}" lambda_function.py
+
+echo "Created ${ZIP_FILE}"

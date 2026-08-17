@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OUTPUT="function.zip"
-LAMBDA_FILE="lambda_function.py"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+OUTPUT="${ROOT_DIR}/function.zip"
+LAMBDA_FILE="${ROOT_DIR}/lambda_function.py"
 
 if [ ! -f "$LAMBDA_FILE" ]; then
   echo "Error: $LAMBDA_FILE not found"
@@ -11,6 +13,7 @@ fi
 
 rm -f "$OUTPUT"
 
-zip "$OUTPUT" "$LAMBDA_FILE"
+cd "$ROOT_DIR"
+zip "$OUTPUT" "lambda_function.py"
 
 echo "Created $OUTPUT"
