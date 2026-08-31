@@ -3,6 +3,9 @@ import { AppComponent } from './app.component';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
+    localStorage.removeItem('geo-ai-explorer-theme');
+    document.documentElement.classList.remove('app-dark');
+
     await TestBed.configureTestingModule({
       imports: [AppComponent],
     }).compileComponents();
@@ -14,16 +17,15 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it(`should have the 'rdf-explorer' title`, () => {
+  it('should toggle and persist dark mode', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
-    expect(app.title).toEqual('rdf-explorer');
-  });
+    const initialMode = app.isDarkMode;
 
-  it('should render title', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, rdf-explorer');
+    app.toggleTheme();
+
+    expect(app.isDarkMode).toBe(!initialMode);
+    expect(document.documentElement.classList.contains('app-dark')).toBe(!initialMode);
+    expect(localStorage.getItem('geo-ai-explorer-theme')).toBe(!initialMode ? 'dark' : 'light');
   });
 });

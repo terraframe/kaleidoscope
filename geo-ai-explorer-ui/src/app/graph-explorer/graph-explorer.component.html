@@ -61,7 +61,7 @@
                   [attr.width]="DIMENSIONS.LABEL.WIDTH" [attr.height]="DIMENSIONS.LABEL.HEIGHT">
                   <span [style]="'width:' + DIMENSIONS.LABEL.WIDTH + 'px; height:' + DIMENSIONS.LABEL.HEIGHT + 'px; overflow:hidden; display: inline-block;'">
                     <p xmlns="http://www.w3.org/1999/xhtml" text-anchor="start"
-                    [style]="'color: black; font-size: ' + DIMENSIONS.LABEL.FONTSIZE + 'px; display: table-cell; vertical-align: middle; height:' + DIMENSIONS.LABEL.HEIGHT + 'px; width:' + DIMENSIONS.LABEL.WIDTH + 'px; line-height:' + DIMENSIONS.LABEL.FONTSIZE + 'px;'">
+                    [style]="'color: var(--text-color); font-size: ' + DIMENSIONS.LABEL.FONTSIZE + 'px; display: table-cell; vertical-align: middle; height:' + DIMENSIONS.LABEL.HEIGHT + 'px; width:' + DIMENSIONS.LABEL.WIDTH + 'px; line-height:' + DIMENSIONS.LABEL.FONTSIZE + 'px;'">
                       {{node.label}}</p>
                   </span>
                 </foreignObject>

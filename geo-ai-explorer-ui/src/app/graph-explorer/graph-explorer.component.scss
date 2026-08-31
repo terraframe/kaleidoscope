@@ -1,6 +1,15 @@
 #graph-container {
     position: relative;
-    background-color: white;
+    background-color: var(--surface-card);
+}
+
+::ng-deep .edge .line,
+::ng-deep .arrow-head {
+    stroke: var(--text-color-secondary);
+}
+
+::ng-deep .edge-label {
+    fill: var(--text-color);
 }
 
 #graph-main {

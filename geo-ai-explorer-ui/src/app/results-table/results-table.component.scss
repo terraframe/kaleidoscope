@@ -3,7 +3,7 @@
 }
 
 .highlight {
-  background-color: #ffff9977 !important;
+  background-color: var(--row-highlight) !important;
 }
 
 h2 {
@@ -94,20 +94,20 @@ fa-icon {
 }
 
 .results-collapse-toggle:hover {
-  color: #10b981;
-  border-color: #10b981;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
   background: var(--surface-hover, #f6f7f9);
 }
 
 .results-collapse-toggle:focus-visible {
-  color: #10b981;
-  border-color: #10b981;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
   outline: none;
 }
 
 :host:not(.results-panel-collapsed) .results-collapse-toggle {
-  color: #10b981;
-  border-color: #10b981;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .results-resize-handle {
@@ -124,7 +124,7 @@ fa-icon {
 .results-resize-handle:hover,
 .results-resize-handle:focus-visible {
   background:
-    linear-gradient(to bottom, transparent 0 3px, #10b981 3px 7px, transparent 7px 12px);
+    linear-gradient(to bottom, transparent 0 3px, var(--primary-color) 3px 7px, transparent 7px 12px);
   outline: none;
 }
 
@@ -221,7 +221,7 @@ fa-icon {
 }
 
 .pin-button:hover:not(:disabled) {
-  background: rgba(15, 23, 42, 0.08);
+  background: var(--code-background);
 }
 
 .pin-button.pinned {
@@ -299,10 +299,10 @@ fa-icon {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--surface-border);
   border-radius: 6px;
-  background: #fff;
-  color: #475569;
+  background: var(--surface-card);
+  color: var(--text-color-secondary);
   padding: 0.4rem 0.55rem;
   font: inherit;
   font-size: 0.82rem;
@@ -312,8 +312,8 @@ fa-icon {
 
 .results-export-button:hover,
 .results-export-button:focus-visible {
-  color: #10b981;
-  border-color: #10b981;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
   outline: none;
 }
 
@@ -345,7 +345,7 @@ fa-icon {
   align-items: center;
   justify-content: center;
 
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--overlay-background);
   pointer-events: all;
 }
 

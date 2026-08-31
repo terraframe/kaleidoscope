@@ -5,7 +5,16 @@
   <title>Geo AI Explorer</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <link rel="icon" type="image/x-icon" href="assets/system-logo.svg">
+  <script>
+    (() => {
+      const savedTheme = localStorage.getItem('geo-ai-explorer-theme');
+      const dark = savedTheme ? savedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('app-dark', dark);
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    })();
+  </script>
 </head>
 <body>
   <app-root></app-root>

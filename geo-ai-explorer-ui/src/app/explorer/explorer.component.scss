@@ -67,7 +67,7 @@
   margin: 0;
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid var(--surface-border, #dfe3ea);
-  background: #f8fafc;
+  background: var(--surface-section);
   font-size: 1rem;
   font-weight: 700;
   line-height: 1.25;
@@ -170,17 +170,18 @@ p-tabs, p-tabpanels, p-tabpanel, graph-explorer {
 }
 
 .save-query-form label {
-  color: #334155;
+  color: var(--text-color);
   font-weight: 650;
 }
 
 .save-query-form input {
   width: 100%;
   min-width: 0;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--surface-border);
   border-radius: 6px;
   padding: 0.55rem 0.65rem;
-  color: #172033;
+  color: var(--text-color);
+  background: var(--surface-card);
   font: inherit;
 }
 
@@ -200,14 +201,14 @@ p-tabs, p-tabpanels, p-tabpanel, graph-explorer {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.65rem 0.75rem;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--surface-border);
   border-radius: 6px;
-  background: #f8fafc;
-  color: #475569;
+  background: var(--surface-section);
+  color: var(--text-color-secondary);
 }
 
 .saved-query-meta strong {
-  color: #172033;
+  color: var(--text-color);
   font-weight: 650;
   text-align: right;
 }
@@ -367,11 +368,11 @@ results-table {
   max-width: min(24rem, calc(100% - 18rem));
   margin: 0;
   padding: 0.6rem 1rem;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--surface-border);
   border-radius: 6px;
   overflow: hidden;
   background: color-mix(in srgb, var(--surface-card, #fff) 100%, transparent);
-  color: #172033;
+  color: var(--text-color);
   font-size: 1.12rem;
   font-weight: 800;
   line-height: 1.18;
@@ -457,12 +458,12 @@ results-table {
   min-height: 2.75rem;
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid var(--surface-border, #dfe3ea);
-  background: #f8fafc;
+  background: var(--surface-section);
 }
 
 .object-pane-header h3 {
   margin: 0;
-  color: #172033;
+  color: var(--text-color);
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.2;
@@ -496,7 +497,7 @@ results-table {
   width: 10px;
   cursor: col-resize;
   background:
-    linear-gradient(to right, transparent 0 4px, #cbd5e1 4px 6px, transparent 6px 10px);
+    linear-gradient(to right, transparent 0 4px, var(--surface-border) 4px 6px, transparent 6px 10px);
   touch-action: none;
 }
 
@@ -505,7 +506,7 @@ results-table {
 .graph-resizer:hover,
 .graph-resizer:focus-visible {
   background:
-    linear-gradient(to right, transparent 0 3px, #10b981 3px 7px, transparent 7px 10px);
+    linear-gradient(to right, transparent 0 3px, var(--primary-color) 3px 7px, transparent 7px 10px);
   outline: none;
 }
 
@@ -518,7 +519,7 @@ results-table {
   width: 10px;
   cursor: col-resize;
   background:
-    linear-gradient(to right, transparent 0 4px, #cbd5e1 4px 6px, transparent 6px 10px);
+    linear-gradient(to right, transparent 0 4px, var(--surface-border) 4px 6px, transparent 6px 10px);
   touch-action: none;
 }
 
@@ -553,10 +554,10 @@ results-table {
 .inspector-pull-tab {
   width: 35px;
   height: 35px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--surface-border);
   border-radius: 6px;
-  background: #fff;
-  color: #64748b;
+  background: var(--surface-card);
+  color: var(--text-color-secondary);
   cursor: pointer;
   font-size: 1.35rem;
   line-height: 1;
@@ -575,10 +576,10 @@ results-table {
 .relationship-btn {
   width: 35px;
   height: 35px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--surface-border);
   border-radius: 6px;
-  background: #fff;
-  color: #64748b;
+  background: var(--surface-card);
+  color: var(--text-color-secondary);
   cursor: pointer;
   font-size: 1.15rem;
   line-height: 1;
@@ -816,7 +817,7 @@ results-table {
   height: 1.25rem;
   border-radius: 4px;
   cursor: grab;
-  background-image: radial-gradient(circle, #64748b 1.1px, transparent 1.3px);
+  background-image: radial-gradient(circle, var(--text-color-secondary) 1.1px, transparent 1.3px);
   background-size: 4px 4px;
   opacity: 0.75;
 }
@@ -891,7 +892,7 @@ results-table {
 ::ng-deep .map-feature-popup .maplibregl-popup-close-button {
   width: 2rem;
   height: 2rem;
-  color: #64748b;
+  color: var(--text-color-secondary);
   font-size: 1.25rem;
 }
 
@@ -900,14 +901,14 @@ results-table {
   flex-direction: column;
   width: min(420px, calc(100vw - 2rem));
   max-height: min(520px, calc(100vh - 5rem));
-  background: #fff;
+  background: var(--surface-card);
 }
 
 ::ng-deep .map-feature-popup-title {
   margin: 0;
   padding: 0.85rem 2.25rem 0.75rem 1rem;
   border-bottom: 1px solid var(--surface-border, #dfe3ea);
-  color: #172033;
+  color: var(--text-color);
   font-size: 1rem;
   font-weight: 700;
   line-height: 1.2;
@@ -921,22 +922,22 @@ results-table {
 ::ng-deep .map-feature-popup-attributes table {
   width: 100%;
   border-collapse: collapse;
-  color: #334155;
+  color: var(--text-color);
   font-size: 0.86rem;
 }
 
 ::ng-deep .map-feature-popup-attributes th,
 ::ng-deep .map-feature-popup-attributes td {
   padding: 0.45rem 0.65rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--surface-border);
   text-align: left;
   vertical-align: top;
 }
 
 ::ng-deep .map-feature-popup-attributes th {
   width: 34%;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--surface-section);
+  color: var(--text-color);
   font-weight: 700;
 }
 
@@ -949,15 +950,15 @@ results-table {
   justify-content: flex-end;
   padding: 0.75rem;
   border-top: 1px solid var(--surface-border, #dfe3ea);
-  background: #fff;
+  background: var(--surface-card);
 }
 
 ::ng-deep .map-feature-popup-inspect {
   min-width: 5.75rem;
-  border: 1px solid #10b981;
+  border: 1px solid var(--primary-color);
   border-radius: 6px;
-  background: #10b981;
-  color: #fff;
+  background: var(--primary-color);
+  color: var(--primary-contrast);
   padding: 0.5rem 0.85rem;
   font: inherit;
   font-weight: 700;
