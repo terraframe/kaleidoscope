@@ -26,28 +26,15 @@ public class MapboxProxyController {
 
     private static final String MAPBOX_BASE_URL = "https://api.mapbox.com";
 
-    public static final Logger logger = LoggerFactory.getLogger(MapboxProxyController.class);
+    private static final Logger logger = LoggerFactory.getLogger(MapboxProxyController.class);
     
-    private static final Set<String> BLOCKED_RESPONSE_HEADERS = Set.of(
-        "connection",
-        "content-length",
-        "transfer-encoding",
-        "keep-alive",
-        "proxy-authenticate",
-        "proxy-authorization",
-        "te",
-        "trailer",
-        "upgrade",
-
-        // Do not forward Mapbox CORS headers.
-        // Your Spring app should own CORS.
-        "access-control-allow-origin",
-        "access-control-allow-methods",
-        "access-control-allow-headers",
-        "access-control-expose-headers",
-        "access-control-allow-credentials",
-        "access-control-max-age",
-        "vary"
+    private static final Set<String> ALLOWED_RESPONSE_HEADERS = Set.of(
+        "content-type",
+//        "content-encoding", // Are we dealing with encoded responses?
+        "cache-control",
+        "etag",
+        "last-modified",
+        "expires"
     );
 
     private final HttpClient httpClient;
@@ -66,6 +53,8 @@ public class MapboxProxyController {
             HttpServletRequest request,
             @RequestParam MultiValueMap<String, String> queryParams
     ) throws IOException, InterruptedException {
+      
+      logger.info("Attempting to request mapbox url [" + request.getRequestURI() + "]");
 
       try {
         String requestUri = request.getRequestURI();
@@ -87,16 +76,24 @@ public class MapboxProxyController {
         HttpHeaders responseHeaders = new HttpHeaders();
 
         mapboxResponse.headers().map().forEach((name, values) -> {
-            if (!BLOCKED_RESPONSE_HEADERS.contains(name.toLowerCase())) {
+            if (ALLOWED_RESPONSE_HEADERS.contains(name.toLowerCase())) {
                 responseHeaders.put(name, values);
             }
         });
+        
+        logger.info(
+            "Mapbox returned status [{}] for path [{}] with headers [{}] and body size [{}]",
+            mapboxResponse.statusCode(),
+            request.getRequestURI(),
+            responseHeaders.keySet(),
+            mapboxResponse.body().length
+        );
 
         return ResponseEntity
                 .status(mapboxResponse.statusCode())
                 .headers(responseHeaders)
                 .body(mapboxResponse.body());
-      } catch (Throwable t) {
+      } catch (Exception t) {
         logger.error("Mapbox proxy request failed for path [{}]", request.getRequestURI(), t);
         throw t;
       }
