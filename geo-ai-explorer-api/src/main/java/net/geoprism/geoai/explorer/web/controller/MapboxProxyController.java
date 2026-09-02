@@ -26,8 +26,6 @@ public class MapboxProxyController {
 
     private static final String MAPBOX_BASE_URL = "https://api.mapbox.com";
 
-    private static final Logger logger = LoggerFactory.getLogger(MapboxProxyController.class);
-    
     private static final Set<String> ALLOWED_RESPONSE_HEADERS = Set.of(
         "content-type",
 //        "content-encoding", // Are we dealing with encoded responses?
@@ -54,49 +52,34 @@ public class MapboxProxyController {
             @RequestParam MultiValueMap<String, String> queryParams
     ) throws IOException, InterruptedException {
       
-      logger.info("Attempting to request mapbox url [" + request.getRequestURI() + "]");
+      String requestUri = request.getRequestURI();
 
-      try {
-        String requestUri = request.getRequestURI();
+      String mapboxPath = requestUri.replaceFirst("^/api/mapbox", "");
 
-        String mapboxPath = requestUri.replaceFirst("^/api/mapbox", "");
+      URI targetUri = buildMapboxUri(mapboxPath, queryParams);
 
-        URI targetUri = buildMapboxUri(mapboxPath, queryParams);
+      HttpRequest outboundRequest = HttpRequest.newBuilder()
+              .uri(targetUri)
+              .GET()
+              .build();
 
-        HttpRequest outboundRequest = HttpRequest.newBuilder()
-                .uri(targetUri)
-                .GET()
-                .build();
+      HttpResponse<byte[]> mapboxResponse = httpClient.send(
+              outboundRequest,
+              HttpResponse.BodyHandlers.ofByteArray()
+      );
 
-        HttpResponse<byte[]> mapboxResponse = httpClient.send(
-                outboundRequest,
-                HttpResponse.BodyHandlers.ofByteArray()
-        );
+      HttpHeaders responseHeaders = new HttpHeaders();
 
-        HttpHeaders responseHeaders = new HttpHeaders();
+      mapboxResponse.headers().map().forEach((name, values) -> {
+          if (ALLOWED_RESPONSE_HEADERS.contains(name.toLowerCase())) {
+              responseHeaders.put(name, values);
+          }
+      });
 
-        mapboxResponse.headers().map().forEach((name, values) -> {
-            if (ALLOWED_RESPONSE_HEADERS.contains(name.toLowerCase())) {
-                responseHeaders.put(name, values);
-            }
-        });
-        
-        logger.info(
-            "Mapbox returned status [{}] for path [{}] with headers [{}] and body size [{}]",
-            mapboxResponse.statusCode(),
-            request.getRequestURI(),
-            responseHeaders.keySet(),
-            mapboxResponse.body().length
-        );
-
-        return ResponseEntity
-                .status(mapboxResponse.statusCode())
-                .headers(responseHeaders)
-                .body(mapboxResponse.body());
-      } catch (Exception t) {
-        logger.error("Mapbox proxy request failed for path [{}]", request.getRequestURI(), t);
-        throw t;
-      }
+      return ResponseEntity
+              .status(mapboxResponse.statusCode())
+              .headers(responseHeaders)
+              .body(mapboxResponse.body());
     }
 
     private URI buildMapboxUri(String path, MultiValueMap<String, String> queryParams) {
