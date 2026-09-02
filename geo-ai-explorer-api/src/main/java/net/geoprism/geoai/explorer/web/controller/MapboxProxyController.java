@@ -7,6 +7,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,8 @@ public class MapboxProxyController {
 
     private static final String MAPBOX_BASE_URL = "https://api.mapbox.com";
 
+    public static final Logger logger = LoggerFactory.getLogger(MapboxProxyController.class);
+    
     private static final Set<String> BLOCKED_RESPONSE_HEADERS = Set.of(
         "connection",
         "content-length",
@@ -63,6 +67,7 @@ public class MapboxProxyController {
             @RequestParam MultiValueMap<String, String> queryParams
     ) throws IOException, InterruptedException {
 
+      try {
         String requestUri = request.getRequestURI();
 
         String mapboxPath = requestUri.replaceFirst("^/api/mapbox", "");
@@ -91,6 +96,10 @@ public class MapboxProxyController {
                 .status(mapboxResponse.statusCode())
                 .headers(responseHeaders)
                 .body(mapboxResponse.body());
+      } catch (Throwable t) {
+        logger.error("Mapbox proxy request failed for path [{}]", request.getRequestURI(), t);
+        throw t;
+      }
     }
 
     private URI buildMapboxUri(String path, MultiValueMap<String, String> queryParams) {
