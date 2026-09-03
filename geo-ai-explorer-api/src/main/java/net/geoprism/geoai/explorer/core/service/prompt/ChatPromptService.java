@@ -19,12 +19,12 @@ import net.geoprism.geoai.explorer.core.config.AppProperties;
  * protected component methods that describe the dataset's schema, semantics,
  * use cases, and examples.</p>
  */
-@Service
-@ConditionalOnProperty(
-    name = "data.usecase",
-    havingValue = "default",
-    matchIfMissing = true
-)
+//@Service
+//@ConditionalOnProperty(
+//    name = "data.usecase",
+//    havingValue = "default",
+//    matchIfMissing = true
+//)
 public class ChatPromptService
 {
   @Autowired

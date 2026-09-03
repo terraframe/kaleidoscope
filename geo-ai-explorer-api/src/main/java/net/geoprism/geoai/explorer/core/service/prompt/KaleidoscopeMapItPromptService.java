@@ -9,7 +9,8 @@ import org.springframework.stereotype.Service;
 @Service
 @ConditionalOnProperty(
     name = "data.usecase",
-    havingValue = "kaleidoscope"
+    havingValue = "kaleidoscope",
+    matchIfMissing = true
 )
 public class KaleidoscopeMapItPromptService extends MapItPromptService
 {
