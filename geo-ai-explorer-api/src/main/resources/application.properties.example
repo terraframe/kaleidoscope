@@ -11,6 +11,8 @@ sparql.url=http://example.com/jena:3030/inundation/
 
 mapbox.key=
 
+data.usecase=spn
+
 # OpenSearch
 #explorer.search=opensearch
 #opensearch.host=search-usace-test-example.aos.us-west-2.on.aws

@@ -25,6 +25,8 @@ import jakarta.servlet.http.HttpServletRequest;
 public class MapboxProxyController {
 
     private static final String MAPBOX_BASE_URL = "https://api.mapbox.com";
+    
+    public static final Logger logger = LoggerFactory.getLogger(MapboxProxyController.class);
 
     private static final Set<String> ALLOWED_RESPONSE_HEADERS = Set.of(
         "content-type",

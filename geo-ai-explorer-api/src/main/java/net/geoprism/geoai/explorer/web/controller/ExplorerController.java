@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -33,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import net.geoprism.geoai.explorer.core.config.AppProperties;
 import net.geoprism.geoai.explorer.core.model.Graph;
 import net.geoprism.geoai.explorer.core.model.Location;
 import net.geoprism.geoai.explorer.core.model.LocationPage;
@@ -49,6 +48,9 @@ public class ExplorerController
   
   @Autowired
   private BasicSearchService search;
+  
+  @Autowired
+  protected AppProperties    properties;
 
   @PostMapping("/api/neighbors")
   @ResponseBody
@@ -114,7 +116,7 @@ public class ExplorerController
       @RequestParam(name = "includeGeometry", required = false, defaultValue = "false") Boolean includeGeometry, 
       @RequestParam(name = "hasPrefix", required = false, defaultValue = "true") Boolean hasPrefix)
   {
-    uri = hasPrefix ? uri : GraphQueryService.OBJECT_PREFIX + uri;
+    uri = hasPrefix ? uri : properties.getLpgPrefix() + uri;
     
     Location location = this.graph.getAttributes(uri, includeGeometry);
 

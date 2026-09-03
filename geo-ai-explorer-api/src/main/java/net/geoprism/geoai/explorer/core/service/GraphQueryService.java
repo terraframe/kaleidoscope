@@ -54,29 +54,33 @@ import net.geoprism.geoai.explorer.core.model.TypeSummary;
 @Service
 public class GraphQueryService
 {
-  public static final String OBJECT_PREFIX                  = "https://localhost:4200/lpg/graph_801104/0/rdfs#";
+  protected String buildPrefixes()
+  {
+    return """
+      PREFIX obj: <%s#>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+      PREFIX spatialF: <http://jena.apache.org/function/spatial#>
+      """.formatted(properties.getLpgPrefix());
+  }
 
-  public static final String PREFIXES                       = """
-          PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
-          PREFIX lpg: <https://localhost:4200/lpg#>
-          PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
-          PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
-          PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-          PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-          PREFIX spatialF: <http://jena.apache.org/function/spatial#>
-      """;
-
-  public static String       ATTRIBUTES_QUERY               = PREFIXES + """
+  protected String buildAttributesQuery()
+  {
+    return buildPrefixes() + """
       SELECT ?s ?p ?o
-      FROM <https://localhost:4200/lpg/graph_801104/0#>
+      FROM <%s>
       WHERE {
         BIND(?uri as ?s) .
         ?s ?p ?o .
-      }""";
+      }
+      """.formatted(properties.getSparqlGraph());
+  }
 
-  public static String       ATTRIBUTES_WITH_GEOMETRY_QUERY = PREFIXES + """
+  protected String buildAttributesWithGeometryQuery()
+  {
+    return buildPrefixes() + """
       SELECT *
-      FROM <https://localhost:4200/lpg/graph_801104/0#>
+      FROM <%s>
       WHERE {
         {
           SELECT ?s ?p ?o WHERE {
@@ -95,110 +99,111 @@ public class GraphQueryService
           }
         }
       }
-      """;
+      """.formatted(properties.getSparqlGraph());
+  }
 
-  public static String       NEIGHBOR_QUERY                 = PREFIXES + """
-              PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
-              PREFIX lpg: <https://localhost:4200/lpg#>
-              PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
-              PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
-              PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-              PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-              PREFIX spatialF: <http://jena.apache.org/function/spatial#>
+  protected String buildNeighborQuery()
+  {
+    return """
+      PREFIX obj: <%s#>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+      PREFIX spatialF: <http://jena.apache.org/function/spatial#>
 
-              SELECT
-              ?gf1 ?ft1 ?f1 ?wkt1 ?lbl1 ?code1 # Source Object
-              ?e1 ?ev1 # Outgoing Edge
-              ?gf2 ?ft2 ?f2 ?wkt2 ?lbl2 ?code2 # Outgoing Vertex (f1 → f2)
-              ?e2 ?ev2 # Incoming Edge
-              ?gf3 ?ft3 ?f3 ?wkt3 ?lbl3 ?code3 # Incoming Vertex (f3 → f1)
-              FROM lpgv:
-              WHERE {
-                  BIND(geo:Feature as ?gf1) .
-                  BIND(?uri as ?f1) .
+      SELECT
+      ?gf1 ?ft1 ?f1 ?wkt1 ?lbl1 ?code1 # Source Object
+      ?e1 ?ev1 # Outgoing Edge
+      ?gf2 ?ft2 ?f2 ?wkt2 ?lbl2 ?code2 # Outgoing Vertex (f1 → f2)
+      ?e2 ?ev2 # Incoming Edge
+      ?gf3 ?ft3 ?f3 ?wkt3 ?lbl3 ?code3 # Incoming Vertex (f3 → f1)
+      FROM <%s>
+      WHERE {
+          BIND(geo:Feature as ?gf1) .
+          BIND(?uri as ?f1) .
 
-                  # Source Object
-                  ?f1 a ?ft1 .
-                  ?f1 rdfs:label ?lbl1 .
-                  ?f1 lpgs:GeoObject-code ?code1 .
+          # Source Object
+          ?f1 a ?ft1 .
+          ?f1 rdfs:label ?lbl1 .
+          ?f1 obj:GeoObject-code ?code1 .
 
-                  OPTIONAL {
-                      ?f1 geo:hasGeometry ?g1 .
-                      ?g1 geo:asWKT ?wkt1 .
-                  }
+          OPTIONAL {
+              ?f1 geo:hasGeometry ?g1 .
+              ?g1 geo:asWKT ?wkt1 .
+          }
 
-                  {
-                      # Outgoing Relationship
-                      ?f1 ?e1 ?f2 .
-                      ?f2 a ?ft2 .
-                      ###TYPE_FILTER_FILTER1###
-                      ?f2 rdfs:label ?lbl2 .
-                      ?f2 lpgs:GeoObject-code ?code2 .
+          {
+              # Outgoing Relationship
+              ?f1 ?e1 ?f2 .
+              ?f2 a ?ft2 .
+              ###TYPE_FILTER_FILTER1###
+              ?f2 rdfs:label ?lbl2 .
+              ?f2 obj:GeoObject-code ?code2 .
 
-                      BIND(geo:Feature as ?gf2) .
-                      BIND(?f2 as ?ev1) .
+              BIND(geo:Feature as ?gf2) .
+              BIND(?f2 as ?ev1) .
 
-                      OPTIONAL {
-                          ?f2 geo:hasGeometry ?g2 .
-                          ?g2 geo:asWKT ?wkt2 .
-                      }
-                  }
-                  UNION
-                  {
-                      # Incoming Relationship
-                      ?f3 ?e2 ?f1 .
-                      ?f3 a ?ft3 .
-                      ###TYPE_FILTER_FILTER2###
-                      ?f3 rdfs:label ?lbl3 .
-                      ?f3 lpgs:GeoObject-code ?code3 .
-
-                      BIND(geo:Feature as ?gf3) .
-                      BIND(?f3 as ?ev2) .
-
-                      OPTIONAL {
-                          ?f3 geo:hasGeometry ?g3 .
-                          ?g3 geo:asWKT ?wkt3 .
-                      }
-                  }
+              OPTIONAL {
+                  ?f2 geo:hasGeometry ?g2 .
+                  ?g2 geo:asWKT ?wkt2 .
               }
-              LIMIT 100
-      """;
+          }
+          UNION
+          {
+              # Incoming Relationship
+              ?f3 ?e2 ?f1 .
+              ?f3 a ?ft3 .
+              ###TYPE_FILTER_FILTER2###
+              ?f3 rdfs:label ?lbl3 .
+              ?f3 obj:GeoObject-code ?code3 .
 
-  public static String       NEIGHBOR_METADATA_QUERY        = PREFIXES + """
-              PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
-      PREFIX lpg: <https://localhost:4200/lpg#>
-      PREFIX lpgv: <https://localhost:4200/lpg/graph_801104/0#>
-      PREFIX lpgvs: <https://localhost:4200/lpg/graph_801104/0/rdfs#>
+              BIND(geo:Feature as ?gf3) .
+              BIND(?f3 as ?ev2) .
+
+              OPTIONAL {
+                  ?f3 geo:hasGeometry ?g3 .
+                  ?g3 geo:asWKT ?wkt3 .
+              }
+          }
+      }
+      LIMIT 100
+      """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
+  }
+
+  protected String buildNeighborMetadataQuery()
+  {
+    return """
+      PREFIX obj: <%s#>
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
       PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 
       SELECT ?type (COUNT(DISTINCT ?obj) AS ?count)
-      FROM lpgv:
+      FROM <%s>
       WHERE {
         {
           # Type of source object
           BIND(?uri AS ?obj)
           ?obj a ?type .
-          ?obj lpgs:GeoObject-code ?code .
+          ?obj obj:GeoObject-code ?code .
         }
         UNION
         {
           # Outgoing object types
           ?uri ?p1 ?obj .
           ?obj a ?type .
-          ?obj lpgs:GeoObject-code ?code .
+          ?obj obj:GeoObject-code ?code .
         }
         UNION
         {
           # Incoming object types
           ?obj ?p2 ?uri .
           ?obj a ?type .
-          ?obj lpgs:GeoObject-code ?code .
+          ?obj obj:GeoObject-code ?code .
         }
       }
       GROUP BY ?type
       ORDER BY DESC(?count)
-              """;
+      """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
+  }
 
   @Autowired
   protected AppProperties    properties;
@@ -827,7 +832,7 @@ public class GraphQueryService
 
     try (RDFConnection conn = this.createConnection())
     {
-      String statement = includeGeometry ? ATTRIBUTES_WITH_GEOMETRY_QUERY : ATTRIBUTES_QUERY;
+      String statement = includeGeometry ? buildAttributesWithGeometryQuery() : buildAttributesQuery();
 
       // Use ParameterizedSparqlString to inject the URI safely
       ParameterizedSparqlString pss = new ParameterizedSparqlString();
@@ -901,7 +906,7 @@ public class GraphQueryService
     try (RDFConnection conn = this.createConnection())
     {
       ParameterizedSparqlString pss = new ParameterizedSparqlString();
-      pss.setCommandText(NEIGHBOR_METADATA_QUERY);
+      pss.setCommandText(buildNeighborMetadataQuery());
       pss.setIri("uri", uri);
 
       conn.querySelect(pss.asQuery(), (qs) -> {
@@ -912,7 +917,7 @@ public class GraphQueryService
     // Grab the data
     try (RDFConnection conn = this.createConnection())
     {
-      String q = NEIGHBOR_QUERY.replace("###TYPE_FILTER_FILTER1###", exclusionFor("?ft2", excludedTypes)).replace("###TYPE_FILTER_FILTER2###", exclusionFor("?ft3", excludedTypes));
+      String q = buildNeighborQuery().replace("###TYPE_FILTER_FILTER1###", exclusionFor("?ft2", excludedTypes)).replace("###TYPE_FILTER_FILTER2###", exclusionFor("?ft3", excludedTypes));
 
       ParameterizedSparqlString pss = new ParameterizedSparqlString();
       pss.setCommandText(q);
@@ -1021,14 +1026,14 @@ public class GraphQueryService
   {
     StringBuilder sparql = new StringBuilder();
 
-    sparql.append(PREFIXES);
+    sparql.append(buildPrefixes());
     sparql.append("""
 
         SELECT ?uri ?p ?o
-        FROM <https://localhost:4200/lpg/graph_801104/0#>
+        FROM <%s>
         WHERE {
           VALUES ?uri {
-        """);
+        """.formatted(properties.getSparqlGraph()));
 
     for (Location location : locations)
     {

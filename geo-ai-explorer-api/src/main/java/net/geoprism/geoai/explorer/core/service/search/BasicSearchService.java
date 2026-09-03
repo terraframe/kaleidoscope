@@ -26,9 +26,17 @@ import net.geoprism.geoai.explorer.core.service.GraphQueryService;
 @Service
 public class BasicSearchService
 {
-  public static final String BASIC_TEXT_SEARCH = GraphQueryService.PREFIXES + """
+  @Autowired
+  protected GraphQueryService  graph;
+  
+  @Autowired
+  protected AppProperties properties;
+  
+  protected String getSparqlQuery()
+  {
+    return """
       SELECT ?uri ?type ?code ?label ?wkt
-      FROM <https://localhost:4200/lpg/graph_801104/0#>
+      FROM <%s>
       WHERE {
         ?uri lpgs:GeoObject-code ?code .
         ?uri rdfs:label ?label .
@@ -42,10 +50,8 @@ public class BasicSearchService
         }
       }
       ORDER BY ASC(?label)
-      """;
-
-  @Autowired
-  protected GraphQueryService  graph;
+            """.formatted(properties.getSparqlGraph());
+  }
 
   public LocationPage fullTextLookup(String query, int offset, int limit)
   {
@@ -54,7 +60,7 @@ public class BasicSearchService
     try (RDFConnection conn = graph.createConnection())
     {
       {
-        String sparql = BASIC_TEXT_SEARCH + " LIMIT " + limit + " OFFSET " + offset;
+        String sparql = getSparqlQuery() + " LIMIT " + limit + " OFFSET " + offset;
 
         ParameterizedSparqlString pss = new ParameterizedSparqlString();
         pss.setCommandText(sparql);
@@ -84,7 +90,7 @@ public class BasicSearchService
       page.setCount(results.size());
       page.setLimit(limit);
       page.setOffset(offset);
-      page.setStatement(BASIC_TEXT_SEARCH.replace("?query", FmtUtils.stringForString(query)));
+      page.setStatement(getSparqlQuery().replace("?query", FmtUtils.stringForString(query)));
 
       return page;
     }

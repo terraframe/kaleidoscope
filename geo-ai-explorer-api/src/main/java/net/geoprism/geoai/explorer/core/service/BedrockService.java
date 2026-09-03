@@ -18,6 +18,8 @@ import net.geoprism.geoai.explorer.core.config.AppProperties;
 import net.geoprism.geoai.explorer.core.model.GenericRestException;
 import net.geoprism.geoai.explorer.core.model.History;
 import net.geoprism.geoai.explorer.core.model.Message;
+import net.geoprism.geoai.explorer.core.service.prompt.ChatPromptService;
+import net.geoprism.geoai.explorer.core.service.prompt.MapItPromptService;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreAsyncClient;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessContentBlock;
@@ -27,6 +29,7 @@ import software.amazon.awssdk.services.bedrockagentcore.model.HarnessConversatio
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessMessage;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessMessageStartEvent;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessMessageStopEvent;
+import software.amazon.awssdk.services.bedrockagentcore.model.HarnessSystemContentBlock;
 import software.amazon.awssdk.services.bedrockagentcore.model.InvokeHarnessRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.InvokeHarnessResponseHandler;
 
@@ -46,6 +49,12 @@ public class BedrockService
 
   @Autowired
   private AppProperties properties;
+  
+  @Autowired
+  private ChatPromptService chatPromptService;
+  
+  @Autowired
+  private MapItPromptService mapItPromptService;
 
   public Message prompt(
       String sessionId,
@@ -58,6 +67,7 @@ public class BedrockService
         properties.getChatAgentHarnessArn(),
         properties.getChatAgentHarnessEndpoint(),
         harnessSessionId,
+        chatPromptService.getPrompt(),
         inputText
     );
 
@@ -121,6 +131,7 @@ public class BedrockService
         properties.getSparqlAgentHarnessArn(),
         properties.getSparqlAgentHarnessEndpoint(),
         UUID.randomUUID().toString(),
+        mapItPromptService.getPrompt(),
         text
     );
 
@@ -136,6 +147,7 @@ public class BedrockService
       String harnessArn,
       String endpoint,
       String sessionId,
+      String systemPrompt,
       String inputText
   ) throws InterruptedException, ExecutionException, TimeoutException
   {
@@ -156,6 +168,8 @@ public class BedrockService
         InvokeHarnessRequest.builder()
             .harnessArn(harnessArn)
             .runtimeSessionId(sessionId)
+            .systemPrompt(HarnessSystemContentBlock.builder().text(systemPrompt).build()
+            )
             .messages(userMessage);
 
     if (endpoint != null && !endpoint.isBlank())
