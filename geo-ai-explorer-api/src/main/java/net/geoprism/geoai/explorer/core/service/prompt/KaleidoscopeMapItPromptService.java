@@ -31,9 +31,21 @@ public class KaleidoscopeMapItPromptService extends MapItPromptService
   @Override
   protected String prefixes()
   {
-    String result = super.prefixes();
+    String result = """
+    =
+    Prefixes
+    =
     
-    result += """
+    To be safe, always include all of these prefixes in your queries.
+
+    A full list of the prefixes used for the IRIs within this database:
+    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+    PREFIX dct: <http://purl.org/dc/terms/>
+    PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    PREFIX sf: <http://www.opengis.net/ont/sf#>
     PREFIX apex: <http://dime.usace.mil/data/dataset#>
     PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
     PREFIX pm: <http://data.sec.usace.army.mil/ontologies/pm#>
@@ -41,7 +53,7 @@ public class KaleidoscopeMapItPromptService extends MapItPromptService
     PREFIX sdsfie: <http://dime.usace.org/taxonomy/sdsfie/>
     PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
     PREFIX lpg: <https://localhost:4200/lpg#>
-    PREFIX lpgv: <%1$s#>
+    PREFIX lpgv: <%1$s>
     PREFIX lpgvs: <%1$s/rdfs#>
         """;
     
@@ -162,8 +174,8 @@ public class KaleidoscopeMapItPromptService extends MapItPromptService
     
     
     rdfs:label - A string literal, defines the label of the GeoObject
-    lpgs:GeoObjectType-code - A string literal, defines the code of the GeoObject. Code is the uniqueness constraint for this dataset.
-    lpgs:GeoObjectType-uid - A generated, unique UUID for the object. Should not be shown to the end user as it does not contain much significance. Use code instead.
+    lpgs:GeoObject-code - A string literal, defines the code of the GeoObject. Code is the uniqueness constraint for this dataset.
+    lpgs:GeoObject-uid - A generated, unique UUID for the object. Should not be shown to the end user as it does not contain much significance. Use code instead.
     
     
     The ‘apex:’ datasets use the following attributes:
