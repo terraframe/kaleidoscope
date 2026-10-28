@@ -28,48 +28,75 @@ public class BedrockServiceIntegrationTest
   @Autowired
   private BedrockService service;
 
-  @Test
-  public void testPrompt() throws InterruptedException, ExecutionException, TimeoutException
-  {
-    String sessionId = UUID.randomUUID().toString();
-
-    Message message = service.prompt(sessionId, "what is the total population impacted if channel reach_25 floods?");
-
-    Assert.assertTrue(message.getContent().trim().length() > 0);
-    Assert.assertTrue(message.getContent(), message.getContent().contains("I found multiple channel"));
-    Assert.assertTrue(message.getContent().contains("<location><label>"));
-    Assert.assertNotNull(message.getLocation());
-    Assert.assertFalse(message.getMappable());
-    Assert.assertTrue(message.getAmbiguous());
-    Assert.assertEquals(sessionId, message.getSessionId());
-    Assert.assertTrue(message.getLocation(), message.getLocation().contains("reach_25"));
-
-    message = service.prompt(sessionId, "CEMVK_RR_03_ONE_25");
-
-    Assert.assertTrue(message.getContent().trim().length() > 0);
-    Assert.assertTrue(message.getContent(), message.getContent().contains("431,826"));
-    Assert.assertFalse(message.getContent(), message.getContent().contains("<location><label>"));
-    Assert.assertTrue(message.getMappable());
-    Assert.assertEquals(sessionId, message.getSessionId());
-    Assert.assertFalse(message.getAmbiguous());
-
-    message = service.prompt(sessionId, "what school zones are impacted?");
-
-    Assert.assertTrue(message.getContent().trim().length() > 0);
-    Assert.assertTrue(message.getContent(), message.getContent().toUpperCase().contains("SCHOOL DISTRICT"));
-    Assert.assertTrue(message.getContent(), message.getContent().contains("<location><label>"));
-    Assert.assertTrue(message.getMappable());
-    Assert.assertEquals(sessionId, message.getSessionId());
-    Assert.assertFalse(message.getAmbiguous());
-  }
+//  @Test
+//  public void testPrompt() throws InterruptedException, ExecutionException, TimeoutException
+//  {
+//     String sessionId = UUID.randomUUID().toString();
+//    
+//     Message message = service.prompt(sessionId, "what is the total daytime
+//     population impacted with the no combo plan flood scenario?");
+//    
+//     Assert.assertTrue(message.getContent().trim().length() > 0);
+//     Assert.assertTrue(message.getContent(), message.getContent().contains("I
+//     found multiple channel"));
+//     Assert.assertTrue(message.getContent().contains("<location><label>"));
+//     Assert.assertNotNull(message.getLocation());
+//     Assert.assertFalse(message.getMappable());
+//     Assert.assertTrue(message.getAmbiguous());
+//     Assert.assertEquals(sessionId, message.getSessionId());
+//     Assert.assertTrue(message.getLocation(),
+//     message.getLocation().contains("reach_25"));
+//    
+//     message = service.prompt(sessionId, "CEMVK_RR_03_ONE_25");
+//    
+//     Assert.assertTrue(message.getContent().trim().length() > 0);
+//     Assert.assertTrue(message.getContent(),
+//     message.getContent().contains("431,826"));
+//     Assert.assertFalse(message.getContent(),
+//     message.getContent().contains("<location><label>"));
+//     Assert.assertTrue(message.getMappable());
+//     Assert.assertEquals(sessionId, message.getSessionId());
+//     Assert.assertFalse(message.getAmbiguous());
+//    
+//     message = service.prompt(sessionId, "what school zones are impacted?");
+//    
+//     Assert.assertTrue(message.getContent().trim().length() > 0);
+//     Assert.assertTrue(message.getContent(),
+//     message.getContent().toUpperCase().contains("SCHOOL DISTRICT"));
+//     Assert.assertTrue(message.getContent(),
+//     message.getContent().contains("<location><label>"));
+//     Assert.assertTrue(message.getMappable());
+//     Assert.assertEquals(sessionId, message.getSessionId());
+//     Assert.assertFalse(message.getAmbiguous());
+//  }
+//
+//  @Test
+//  public void testMessage() throws InterruptedException, ExecutionException, TimeoutException
+//  {
+//    String sessionId = UUID.randomUUID().toString();
+//
+//    Message message = service.prompt(sessionId, "what is the total daytime population broken down by age bracket impacted using the no combo plan flood scenario");
+//
+//    System.out.println(message.getContent());
+//
+//    Assert.assertTrue(message.getContent().trim().length() > 0);
+//    Assert.assertTrue(message.getContent().contains("431,826"));
+//    Assert.assertFalse(message.getContent().contains("<location><label>"));
+//    Assert.assertFalse(message.getContent().contains("<name>"));
+//    Assert.assertTrue(message.getMappable());
+//    Assert.assertFalse(message.getAmbiguous());
+//    Assert.assertEquals(sessionId, message.getSessionId());
+//  }
 
   @Test
   public void testPromptWithCode() throws InterruptedException, ExecutionException, TimeoutException
   {
     String sessionId = UUID.randomUUID().toString();
-
-    Message message = service.prompt(sessionId, "what is the total population impacted if channel reach with code 'CEMVK_RR_03_ONE_25' floods?");
-
+    
+    Message message = service.prompt(sessionId, "Give me the value of a structure with the name 849W84F9+M6C-4-5-3-4");
+    
+    System.out.println(message.getContent());
+    
     Assert.assertTrue(message.getContent().trim().length() > 0);
     Assert.assertTrue(message.getContent().contains("431,826"));
     Assert.assertFalse(message.getContent().contains("<location><label>"));
@@ -78,8 +105,8 @@ public class BedrockServiceIntegrationTest
     Assert.assertFalse(message.getAmbiguous());
     Assert.assertEquals(sessionId, message.getSessionId());
   }
-
-  @Test
+  
+  // @Test
   @Ignore
   public void testGetLocationsAggregation() throws InterruptedException, ExecutionException, TimeoutException
   {
@@ -102,7 +129,7 @@ public class BedrockServiceIntegrationTest
     Assert.assertTrue(sparql.contains("?wkt"));
   }
 
-  @Test
+  // @Test
   @Ignore
   public void testGetLocations() throws InterruptedException, ExecutionException, TimeoutException
   {

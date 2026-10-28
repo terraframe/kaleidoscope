@@ -1,6 +1,7 @@
 package net.geoprism.geoai.explorer.core.service;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -77,5 +78,32 @@ public class JenaServiceIntegrationTest
     Assert.assertNotNull(location.getGeometry());
     Assert.assertNotNull(location.getProperties().get("type"));
     Assert.assertNotNull(location.getProperties().get("uri"));
+  }
+
+  @Test
+  public void testSelect()
+  {
+    String statement = """
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX obj: <https://spn.geoprism.net#>
+
+        SELECT DISTINCT ?structure ?pop2pmu65
+        FROM <https://spn.geoprism.net/spn>          
+        WHERE {
+          ?scenario rdf:type obj:FloodScenario .
+          ?scenario obj:GeoObject-code "1" .
+          ?scenario obj:HasFloodRisk ?landParcel .
+          ?landParcel rdf:type obj:LandParcel .
+          ?structure obj:LocatedIn ?landParcel .
+          ?structure obj:Structure-pop2pmu65 ?pop2pmu65 .
+        }
+        LIMIT 10
+      """;
+
+    List<Map<String, Object>> results = this.service.select(statement);
+
+    Assert.assertTrue(results.size() > 0);
+
   }
 }

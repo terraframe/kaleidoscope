@@ -1,11 +1,14 @@
 package net.geoprism.geoai.explorer.core.service;
 
 import java.time.Duration;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,18 +28,44 @@ import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreAsyncCli
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessContentBlock;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessContentBlockDelta;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessContentBlockDeltaEvent;
+import software.amazon.awssdk.services.bedrockagentcore.model.HarnessContentBlockStart;
+import software.amazon.awssdk.services.bedrockagentcore.model.HarnessContentBlockStartEvent;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessConversationRole;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessMessage;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessMessageStartEvent;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessMessageStopEvent;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessSystemContentBlock;
+import software.amazon.awssdk.services.bedrockagentcore.model.HarnessTool;
+import software.amazon.awssdk.services.bedrockagentcore.model.HarnessToolResultBlock;
+import software.amazon.awssdk.services.bedrockagentcore.model.HarnessToolResultContentBlock;
+import software.amazon.awssdk.services.bedrockagentcore.model.HarnessToolUseStatus;
+import software.amazon.awssdk.services.bedrockagentcore.model.HarnessToolUseType;
 import software.amazon.awssdk.services.bedrockagentcore.model.InvokeHarnessRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.InvokeHarnessResponseHandler;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class BedrockService
 {
+  private static final int MAX_TOOL_ROUNDS = 10;
+
+  private record ToolCall(String toolUseId, String name, StringBuilder input) {}
+
   private static final int MAX_TIMEOUT_MINUTES = 5;
+
+  private static class HarnessTurn
+  {
+    final StringBuilder          text             = new StringBuilder();
+
+    final Map<Integer, ToolCall> messageToolCalls = new ConcurrentHashMap<>();
+
+    volatile List<ToolCall>      pendingToolCalls = List.of();
+
+    volatile String              stopReason;
+
+    volatile String              finalMessage     = "";
+  }
 
   private static final Logger log =
       LoggerFactory.getLogger(BedrockService.class);
@@ -62,6 +91,9 @@ public class BedrockService
   @Autowired
   private MapItPromptService mapItPromptService;
 
+  @Autowired
+  private ToolService toolService;
+  
   public Message prompt(
       String sessionId,
       String inputText
@@ -74,7 +106,8 @@ public class BedrockService
         properties.getChatAgentHarnessEndpoint(),
         harnessSessionId,
         chatPromptService.getPrompt(),
-        inputText
+        inputText,
+        toolService.getDefinitions()
     );
     
     String reasoning = extractReasoning(value);
@@ -163,7 +196,8 @@ public class BedrockService
         properties.getSparqlAgentHarnessEndpoint(),
         UUID.randomUUID().toString(),
         mapItPromptService.getPrompt(),
-        text
+        text,
+        new LinkedList<>()
     );
 
     /*
@@ -174,152 +208,147 @@ public class BedrockService
     return stripCodeFence(response);
   }
 
-  private String invokeHarness(
-      String harnessArn,
-      String endpoint,
-      String sessionId,
-      String systemPrompt,
-      String inputText
-  ) throws InterruptedException, ExecutionException, TimeoutException
+
+private String invokeHarness(String harnessArn, String endpoint, String sessionId,
+    String systemPrompt, String inputText, List<HarnessTool> tools)
+    throws InterruptedException, ExecutionException, TimeoutException
+{
+  validateHarnessConfiguration(harnessArn);
+  validateSessionId(sessionId);
+
+  HarnessMessage nextMessage = HarnessMessage.builder() //
+      .role(HarnessConversationRole.USER) //
+      .content(HarnessContentBlock.builder().text(inputText).build()) //
+      .build();
+
+  try (BedrockAgentCoreAsyncClient client = getClient())
   {
-    validateHarnessConfiguration(harnessArn);
-    validateSessionId(sessionId);
-
-    HarnessMessage userMessage =
-        HarnessMessage.builder()
-            .role(HarnessConversationRole.USER)
-            .content(
-                HarnessContentBlock.builder()
-                    .text(inputText)
-                    .build()
-            )
-            .build();
-
-    InvokeHarnessRequest.Builder requestBuilder =
-        InvokeHarnessRequest.builder()
-            .harnessArn(harnessArn)
-            .runtimeSessionId(sessionId)
-            .systemPrompt(HarnessSystemContentBlock.builder().text(systemPrompt).build()
-            )
-            .messages(userMessage);
-
-    if (endpoint != null && !endpoint.isBlank())
+    for (int round = 0; round < MAX_TOOL_ROUNDS; round++)
     {
-      requestBuilder.qualifier(endpoint);
+      InvokeHarnessRequest.Builder requestBuilder = InvokeHarnessRequest.builder()
+          .harnessArn(harnessArn)
+          .runtimeSessionId(sessionId)
+          .systemPrompt(HarnessSystemContentBlock.builder().text(systemPrompt).build())
+          .tools(tools)
+          .messages(nextMessage);
+
+      if (endpoint != null && !endpoint.isBlank())
+      {
+        requestBuilder.qualifier(endpoint);
+      }
+
+      HarnessTurn turn = streamHarness(client, requestBuilder.build());
+
+      if (!"tool_use".equals(turn.stopReason) || turn.pendingToolCalls.isEmpty())
+      {
+        if (turn.finalMessage.isBlank())
+        {
+          throw new GenericRestException(
+              "AgentCore harness completed without returning a final assistant message.");
+        }
+        return turn.finalMessage;
+      }
+
+      nextMessage = HarnessMessage.builder()
+          .role(HarnessConversationRole.USER)
+          .content(turn.pendingToolCalls.stream().map(this::executeToolCall).toList())
+          .build();
     }
-
-    InvokeHarnessRequest request = requestBuilder.build();
-
-    StringBuilder currentMessage = new StringBuilder();
-    AtomicReference<String> finalMessage =
-        new AtomicReference<>("");
-
-    InvokeHarnessResponseHandler handler =
-        InvokeHarnessResponseHandler.builder()
-            .onResponse(response -> {
-              log.info(
-                  "Response received from AgentCore harness: {}",
-                  response
-              );
-            })
-            .onEventStream(publisher -> {
-              publisher.subscribe(event -> {
-                log.debug(
-                    "AgentCore harness event: {}",
-                    event.sdkEventType()
-                );
-
-                if (event instanceof HarnessMessageStartEvent)
-                {
-                  currentMessage.setLength(0);
-                }
-                else if (
-                    event instanceof HarnessContentBlockDeltaEvent deltaEvent
-                )
-                {
-                  HarnessContentBlockDelta delta =
-                      deltaEvent.delta();
-
-                  if (delta != null &&
-                      delta.type() ==
-                          HarnessContentBlockDelta.Type.TEXT &&
-                      delta.text() != null)
-                  {
-                    currentMessage.append(delta.text());
-                  }
-                }
-                else if (
-                    event instanceof HarnessMessageStopEvent stopEvent
-                )
-                {
-                  String stopReason =
-                      stopEvent.stopReasonAsString();
-
-                  log.debug(
-                      "Harness message completed: {}",
-                      stopReason
-                  );
-
-                  if ("end_turn".equals(stopReason))
-                  {
-                    finalMessage.set(
-                        currentMessage.toString().trim()
-                    );
-                  }
-
-                  currentMessage.setLength(0);
-                }
-              });
-            })
-            .onError(error -> {
-              log.error(
-                  "Error invoking AgentCore harness",
-                  error
-              );
-            })
-            .build();
-
-    try (BedrockAgentCoreAsyncClient client = getClient())
-    {
-      client.invokeHarness(request, handler)
-          .get(
-              MAX_TIMEOUT_MINUTES,
-              TimeUnit.MINUTES
-          );
-    }
-
-    String result = finalMessage.get();
-
-    if (result == null || result.isBlank())
-    {
-      throw new GenericRestException(
-          "AgentCore harness completed without returning a final assistant message."
-      );
-    }
-
-    return result;
   }
 
-  private void appendTextDelta(
-      StringBuilder content,
-      HarnessContentBlockDeltaEvent event
-  )
+  throw new GenericRestException("AgentCore harness exceeded the maximum number of tool rounds.");
+}
+
+private HarnessTurn streamHarness(BedrockAgentCoreAsyncClient client, InvokeHarnessRequest request)
+    throws InterruptedException, ExecutionException, TimeoutException
+{
+  HarnessTurn turn = new HarnessTurn();
+
+  InvokeHarnessResponseHandler handler = InvokeHarnessResponseHandler.builder()
+      .onEventStream(publisher -> publisher.subscribe(event -> {
+        if (event instanceof HarnessMessageStartEvent)
+        {
+          turn.text.setLength(0);
+          turn.messageToolCalls.clear();
+        }
+        else if (event instanceof HarnessContentBlockStartEvent startEvent)
+        {
+          HarnessContentBlockStart start = startEvent.start();
+
+          if (start != null && start.toolUse() != null)
+          {
+            turn.messageToolCalls.put(startEvent.contentBlockIndex(),
+                new ToolCall(start.toolUse().toolUseId(), start.toolUse().name(), new StringBuilder()));
+          }
+        }
+        else if (event instanceof HarnessContentBlockDeltaEvent deltaEvent)
+        {
+          HarnessContentBlockDelta delta = deltaEvent.delta();
+
+          if (delta == null)
+          {
+            return;
+          }
+
+          if (delta.type() == HarnessContentBlockDelta.Type.TEXT && delta.text() != null)
+          {
+            turn.text.append(delta.text());
+          }
+          else if (delta.type() == HarnessContentBlockDelta.Type.TOOL_USE && delta.toolUse() != null)
+          {
+            ToolCall call = turn.messageToolCalls.get(deltaEvent.contentBlockIndex());
+
+            if (call != null && delta.toolUse().input() != null)
+            {
+              call.input().append(delta.toolUse().input());   // JSON arrives in fragments
+            }
+          }
+        }
+        else if (event instanceof HarnessMessageStopEvent stopEvent)
+        {
+          turn.stopReason = stopEvent.stopReasonAsString();
+          turn.pendingToolCalls = List.copyOf(turn.messageToolCalls.values());
+
+          if ("end_turn".equals(turn.stopReason))
+          {
+            turn.finalMessage = turn.text.toString().trim();
+          }
+        }
+      }))
+      .onError(error -> log.error("Error invoking AgentCore harness", error))
+      .build();
+
+  client.invokeHarness(request, handler).get(MAX_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+
+  return turn;
+}
+
+private HarnessContentBlock executeToolCall(ToolCall call)
+{
+  HarnessToolUseStatus status = HarnessToolUseStatus.SUCCESS;
+  String output;
+
+  try
   {
-    HarnessContentBlockDelta delta =
-        event.delta();
-
-    if (delta == null)
-    {
-      return;
-    }
-
-    String text = delta.text();
-
-    if (text != null)
-    {
-      content.append(text);
-    }
+    JsonNode input = JsonMapper.shared().readTree(call.input().isEmpty() ? "{}" : call.input().toString());
+    output = toolService.execute(call.name(), input);
   }
+  catch (Exception e)
+  {
+    log.error("Inline tool {} failed", call.name(), e);
+    status = HarnessToolUseStatus.ERROR;
+    output = "Tool error: " + e.getMessage();   // let the model see the failure and recover
+  }
+
+  return HarnessContentBlock.builder()
+      .toolResult(HarnessToolResultBlock.builder()
+          .toolUseId(call.toolUseId())
+          .type(HarnessToolUseType.TOOL_USE)
+          .status(status)
+          .content(HarnessToolResultContentBlock.builder().text(output).build())
+          .build())
+      .build();
+} 
 
   private String normalizeSessionId(String sessionId)
   {

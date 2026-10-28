@@ -57,156 +57,156 @@ public class GraphQueryService
   protected String buildPrefixes()
   {
     return """
-      PREFIX obj: <%s>
-      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-      PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-      PREFIX spatialF: <http://jena.apache.org/function/spatial#>
-      """.formatted(properties.getLpgPrefix());
+        PREFIX obj: <%s>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+        PREFIX spatialF: <http://jena.apache.org/function/spatial#>
+        """.formatted(properties.getLpgPrefix());
   }
 
   protected String buildAttributesQuery()
   {
     return buildPrefixes() + """
-      SELECT ?s ?p ?o
-      FROM <%s>
-      WHERE {
-        BIND(?uri as ?s) .
-        ?s ?p ?o .
-      }
-      """.formatted(properties.getSparqlGraph());
+        SELECT ?s ?p ?o
+        FROM <%s>
+        WHERE {
+          BIND(?uri as ?s) .
+          ?s ?p ?o .
+        }
+        """.formatted(properties.getSparqlGraph());
   }
 
   protected String buildAttributesWithGeometryQuery()
   {
     return buildPrefixes() + """
-      SELECT *
-      FROM <%s>
-      WHERE {
-        {
-          SELECT ?s ?p ?o WHERE {
-            BIND(?uri as ?s) .
-            ?s ?p ?o .
+        SELECT *
+        FROM <%s>
+        WHERE {
+          {
+            SELECT ?s ?p ?o WHERE {
+              BIND(?uri as ?s) .
+              ?s ?p ?o .
+            }
           }
-        }
-        UNION
-        {
-          SELECT ?s ?p ?o WHERE {
-            BIND(?uri as ?s) .
-            BIND(geo:asWKT as ?p) .
+          UNION
+          {
+            SELECT ?s ?p ?o WHERE {
+              BIND(?uri as ?s) .
+              BIND(geo:asWKT as ?p) .
 
-            ?s geo:hasGeometry ?geom .
-            ?geom ?p ?o
+              ?s geo:hasGeometry ?geom .
+              ?geom ?p ?o
+            }
           }
         }
-      }
-      """.formatted(properties.getSparqlGraph());
+        """.formatted(properties.getSparqlGraph());
   }
 
   protected String buildNeighborQuery()
   {
     return """
-      PREFIX obj: <%s>
-      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-      PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-      PREFIX spatialF: <http://jena.apache.org/function/spatial#>
+        PREFIX obj: <%s>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+        PREFIX spatialF: <http://jena.apache.org/function/spatial#>
 
-      SELECT
-      ?gf1 ?ft1 ?f1 ?wkt1 ?lbl1 ?code1 # Source Object
-      ?e1 ?ev1 # Outgoing Edge
-      ?gf2 ?ft2 ?f2 ?wkt2 ?lbl2 ?code2 # Outgoing Vertex (f1 → f2)
-      ?e2 ?ev2 # Incoming Edge
-      ?gf3 ?ft3 ?f3 ?wkt3 ?lbl3 ?code3 # Incoming Vertex (f3 → f1)
-      FROM <%s>
-      WHERE {
-          BIND(geo:Feature as ?gf1) .
-          BIND(?uri as ?f1) .
+        SELECT
+        ?gf1 ?ft1 ?f1 ?wkt1 ?lbl1 ?code1 # Source Object
+        ?e1 ?ev1 # Outgoing Edge
+        ?gf2 ?ft2 ?f2 ?wkt2 ?lbl2 ?code2 # Outgoing Vertex (f1 → f2)
+        ?e2 ?ev2 # Incoming Edge
+        ?gf3 ?ft3 ?f3 ?wkt3 ?lbl3 ?code3 # Incoming Vertex (f3 → f1)
+        FROM <%s>
+        WHERE {
+            BIND(geo:Feature as ?gf1) .
+            BIND(?uri as ?f1) .
 
-          # Source Object
-          ?f1 a ?ft1 .
-          ?f1 rdfs:label ?lbl1 .
-          ?f1 obj:GeoObject-code ?code1 .
+            # Source Object
+            ?f1 a ?ft1 .
+            ?f1 rdfs:label ?lbl1 .
+            ?f1 obj:GeoObject-code ?code1 .
 
-          OPTIONAL {
-              ?f1 geo:hasGeometry ?g1 .
-              ?g1 geo:asWKT ?wkt1 .
-          }
+            OPTIONAL {
+                ?f1 geo:hasGeometry ?g1 .
+                ?g1 geo:asWKT ?wkt1 .
+            }
 
-          {
-              # Outgoing Relationship
-              ?f1 ?e1 ?f2 .
-              ?f2 a ?ft2 .
-              ###TYPE_FILTER_FILTER1###
-              ?f2 rdfs:label ?lbl2 .
-              ?f2 obj:GeoObject-code ?code2 .
+            {
+                # Outgoing Relationship
+                ?f1 ?e1 ?f2 .
+                ?f2 a ?ft2 .
+                ###TYPE_FILTER_FILTER1###
+                ?f2 rdfs:label ?lbl2 .
+                ?f2 obj:GeoObject-code ?code2 .
 
-              BIND(geo:Feature as ?gf2) .
-              BIND(?f2 as ?ev1) .
+                BIND(geo:Feature as ?gf2) .
+                BIND(?f2 as ?ev1) .
 
-              OPTIONAL {
-                  ?f2 geo:hasGeometry ?g2 .
-                  ?g2 geo:asWKT ?wkt2 .
-              }
-          }
-          UNION
-          {
-              # Incoming Relationship
-              ?f3 ?e2 ?f1 .
-              ?f3 a ?ft3 .
-              ###TYPE_FILTER_FILTER2###
-              ?f3 rdfs:label ?lbl3 .
-              ?f3 obj:GeoObject-code ?code3 .
+                OPTIONAL {
+                    ?f2 geo:hasGeometry ?g2 .
+                    ?g2 geo:asWKT ?wkt2 .
+                }
+            }
+            UNION
+            {
+                # Incoming Relationship
+                ?f3 ?e2 ?f1 .
+                ?f3 a ?ft3 .
+                ###TYPE_FILTER_FILTER2###
+                ?f3 rdfs:label ?lbl3 .
+                ?f3 obj:GeoObject-code ?code3 .
 
-              BIND(geo:Feature as ?gf3) .
-              BIND(?f3 as ?ev2) .
+                BIND(geo:Feature as ?gf3) .
+                BIND(?f3 as ?ev2) .
 
-              OPTIONAL {
-                  ?f3 geo:hasGeometry ?g3 .
-                  ?g3 geo:asWKT ?wkt3 .
-              }
-          }
-      }
-      LIMIT 100
-      """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
+                OPTIONAL {
+                    ?f3 geo:hasGeometry ?g3 .
+                    ?g3 geo:asWKT ?wkt3 .
+                }
+            }
+        }
+        LIMIT 100
+        """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
   }
 
   protected String buildNeighborMetadataQuery()
   {
     return """
-      PREFIX obj: <%s>
-      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-      PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+        PREFIX obj: <%s>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 
-      SELECT ?type (COUNT(DISTINCT ?obj) AS ?count)
-      FROM <%s>
-      WHERE {
-        {
-          # Type of source object
-          BIND(?uri AS ?obj)
-          ?obj a ?type .
-          ?obj obj:GeoObject-code ?code .
+        SELECT ?type (COUNT(DISTINCT ?obj) AS ?count)
+        FROM <%s>
+        WHERE {
+          {
+            # Type of source object
+            BIND(?uri AS ?obj)
+            ?obj a ?type .
+            ?obj obj:GeoObject-code ?code .
+          }
+          UNION
+          {
+            # Outgoing object types
+            ?uri ?p1 ?obj .
+            ?obj a ?type .
+            ?obj obj:GeoObject-code ?code .
+          }
+          UNION
+          {
+            # Incoming object types
+            ?obj ?p2 ?uri .
+            ?obj a ?type .
+            ?obj obj:GeoObject-code ?code .
+          }
         }
-        UNION
-        {
-          # Outgoing object types
-          ?uri ?p1 ?obj .
-          ?obj a ?type .
-          ?obj obj:GeoObject-code ?code .
-        }
-        UNION
-        {
-          # Incoming object types
-          ?obj ?p2 ?uri .
-          ?obj a ?type .
-          ?obj obj:GeoObject-code ?code .
-        }
-      }
-      GROUP BY ?type
-      ORDER BY DESC(?count)
-      """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
+        GROUP BY ?type
+        ORDER BY DESC(?count)
+        """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
   }
 
   @Autowired
-  protected AppProperties    properties;
+  protected AppProperties properties;
 
   public RDFConnection createConnection()
   {
@@ -214,6 +214,44 @@ public class GraphQueryService
         .destination(properties.getSparqlUrl());
 
     return builder.build();
+  }
+
+  public List<Map<String, Object>> select(String statement)
+  {
+    List<Map<String, Object>> results = new LinkedList<>();
+
+    // The agent sometimes includes formatting text. Just remove it...
+
+    try (RDFConnection conn = this.createConnection())
+    {
+      System.out.println("JenaService.query - EXECUTING QUERY");
+      System.out.println(statement);
+      System.out.println();
+
+      conn.querySelect(statement, (qs) -> {
+        Map<String, Object> values = new HashMap<>();
+
+        qs.varNames().forEachRemaining(varName -> {
+          RDFNode node = qs.get(varName);
+
+          if (node.isLiteral())
+          {
+            values.put(varName, node.asLiteral().getValue());
+          }
+          else if (node.isResource())
+          {
+            values.put(varName, node.asResource().getURI());
+          }
+        });
+
+        if (!values.isEmpty())
+        {
+          results.add(values);
+        }
+      });
+
+      return results;
+    }
   }
 
   public List<Location> query(String statement)
@@ -350,17 +388,9 @@ public class GraphQueryService
       return sparql;
     }
 
-    String projectedValue = isSafeSparqlVariableName(field)
-        ? "?" + field + ", "
-        : "";
+    String projectedValue = isSafeSparqlVariableName(field) ? "?" + field + ", " : "";
 
-    String binding = "\n  OPTIONAL {\n" +
-        "    ?uri ?__sortPredicate ?__sortAttributeValue .\n" +
-        "    BIND(REPLACE(STR(?__sortPredicate), \"^.*[#/]\", \"\") AS ?__sortPredicateLocal) .\n" +
-        "    BIND(REPLACE(?__sortPredicateLocal, \"^.*-\", \"\") AS ?__sortPredicateName) .\n" +
-        "    FILTER(?__sortPredicateName = \"" + escapeSparqlString(field) + "\") .\n" +
-        "  }\n" +
-        "  BIND(COALESCE(" + projectedValue + "?__sortAttributeValue) AS ?__sortValue) .\n";
+    String binding = "\n  OPTIONAL {\n" + "    ?uri ?__sortPredicate ?__sortAttributeValue .\n" + "    BIND(REPLACE(STR(?__sortPredicate), \"^.*[#/]\", \"\") AS ?__sortPredicateLocal) .\n" + "    BIND(REPLACE(?__sortPredicateLocal, \"^.*-\", \"\") AS ?__sortPredicateName) .\n" + "    FILTER(?__sortPredicateName = \"" + escapeSparqlString(field) + "\") .\n" + "  }\n" + "  BIND(COALESCE(" + projectedValue + "?__sortAttributeValue) AS ?__sortValue) .\n";
 
     return sparql.substring(0, closeBrace) + binding + sparql.substring(closeBrace);
   }
@@ -440,7 +470,7 @@ public class GraphQueryService
     qs.varNames().forEachRemaining(names::add);
     return names;
   }
-  
+
   private boolean isUnmodifiableField(String varName)
   {
     return switch (varName)
@@ -496,36 +526,36 @@ public class GraphQueryService
 
   public Long getCount(String statement)
   {
-      Map<String, Long> holder = new HashMap<>();
+    Map<String, Long> holder = new HashMap<>();
 
-      statement = normalizeLocationStatement(statement);
+    statement = normalizeLocationStatement(statement);
 
-      StringBuilder sparql = new StringBuilder();
+    StringBuilder sparql = new StringBuilder();
 
-      int selectIndex = indexOfKeyword(statement, "SELECT");
-      int fromIndex = indexOfKeyword(statement, "FROM");
-      int whereIndex = indexOfKeyword(statement, "WHERE");
+    int selectIndex = indexOfKeyword(statement, "SELECT");
+    int fromIndex = indexOfKeyword(statement, "FROM");
+    int whereIndex = indexOfKeyword(statement, "WHERE");
 
-      sparql.append(statement, 0, selectIndex);
-      sparql.append("SELECT (COUNT(DISTINCT ?uri) AS ?count)\n");
+    sparql.append(statement, 0, selectIndex);
+    sparql.append("SELECT (COUNT(DISTINCT ?uri) AS ?count)\n");
 
-      // Only treat FROM as a dataset clause if it occurs
-      // between SELECT and WHERE.
-      if (fromIndex != -1 && fromIndex < whereIndex)
-      {
-          sparql.append(statement, fromIndex, whereIndex);
-      }
+    // Only treat FROM as a dataset clause if it occurs
+    // between SELECT and WHERE.
+    if (fromIndex != -1 && fromIndex < whereIndex)
+    {
+      sparql.append(statement, fromIndex, whereIndex);
+    }
 
-      sparql.append(statement.substring(whereIndex));
+    sparql.append(statement.substring(whereIndex));
 
-      try (RDFConnection conn = this.createConnection())
-      {
-          conn.querySelect(sparql.toString(), (qs) -> {
-              holder.put("count", qs.getLiteral("count").getLong());
-          });
+    try (RDFConnection conn = this.createConnection())
+    {
+      conn.querySelect(sparql.toString(), (qs) -> {
+        holder.put("count", qs.getLiteral("count").getLong());
+      });
 
-          return holder.getOrDefault("count", 0L);
-      }
+      return holder.getOrDefault("count", 0L);
+    }
   }
 
   public List<TypeSummary> getTypeCounts(String statement)
@@ -560,10 +590,7 @@ public class GraphQueryService
       return normalizeLocationStatement(statement);
     }
 
-    List<String> values = excludedTypes.stream()
-        .filter(StringUtils::isNotBlank)
-        .map(this::sparqlValue)
-        .toList();
+    List<String> values = excludedTypes.stream().filter(StringUtils::isNotBlank).map(this::sparqlValue).toList();
 
     if (values.isEmpty())
     {
@@ -668,9 +695,7 @@ public class GraphQueryService
       return clean;
     }
 
-    String prefixAndDataset = clean.substring(0, selectIndex) +
-        "SELECT DISTINCT ?uri ?type ?code ?label ?wkt\n" +
-        clean.substring(indexAfterProjection(clean, selectIndex), whereIndex);
+    String prefixAndDataset = clean.substring(0, selectIndex) + "SELECT DISTINCT ?uri ?type ?code ?label ?wkt\n" + clean.substring(indexAfterProjection(clean, selectIndex), whereIndex);
     String whereBlock = clean.substring(whereIndex, closeBrace);
     String projection = clean.substring(selectIndex, whereIndex);
     List<String> bindings = buildCoreAliasBindings(projection);
@@ -704,10 +729,7 @@ public class GraphQueryService
 
   private List<String> buildCoreAliasBindings(String projection)
   {
-    return List.of("uri", "type", "code", "label", "wkt").stream()
-        .map(alias -> buildAliasBinding(projection, alias))
-        .filter(StringUtils::isNotBlank)
-        .toList();
+    return List.of("uri", "type", "code", "label", "wkt").stream().map(alias -> buildAliasBinding(projection, alias)).filter(StringUtils::isNotBlank).toList();
   }
 
   private String buildAliasBinding(String projection, String alias)
@@ -724,10 +746,7 @@ public class GraphQueryService
 
   private String findProjectionExpression(String projection, String alias)
   {
-    Pattern samplePattern = Pattern.compile(
-        "\\(\\s*SAMPLE\\s*\\(\\s*(.*?)\\s*\\)\\s+AS\\s+\\?" + Pattern.quote(alias) + "\\s*\\)",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-    );
+    Pattern samplePattern = Pattern.compile("\\(\\s*SAMPLE\\s*\\(\\s*(.*?)\\s*\\)\\s+AS\\s+\\?" + Pattern.quote(alias) + "\\s*\\)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     java.util.regex.Matcher sampleMatcher = samplePattern.matcher(projection);
 
     if (sampleMatcher.find())
@@ -735,10 +754,7 @@ public class GraphQueryService
       return sampleMatcher.group(1).trim();
     }
 
-    Pattern aliasPattern = Pattern.compile(
-        "\\(\\s*(.*?)\\s+AS\\s+\\?" + Pattern.quote(alias) + "\\s*\\)",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-    );
+    Pattern aliasPattern = Pattern.compile("\\(\\s*(.*?)\\s+AS\\s+\\?" + Pattern.quote(alias) + "\\s*\\)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     java.util.regex.Matcher aliasMatcher = aliasPattern.matcher(projection);
 
     if (aliasMatcher.find())
@@ -773,7 +789,7 @@ public class GraphQueryService
       char c = value.charAt(i);
       char previous = i > 0 ? value.charAt(i - 1) : '\0';
 
-      if ((c == '"' || c == '\'') && previous != '\\')
+      if ( ( c == '"' || c == '\'' ) && previous != '\\')
       {
         if (!inString)
         {
@@ -978,7 +994,7 @@ public class GraphQueryService
       }
     }
   }
-  
+
   public void injectAttributes(LocationPage locations)
   {
     injectAttributes(locations, false);
@@ -1013,7 +1029,7 @@ public class GraphQueryService
             attribute = attribute.split("-")[1];
           }
 
-          if (isUnmodifiableField(attribute) || (!includeCoreAttributes && isCoreLocationField(attribute)) || attribute.equalsIgnoreCase("asWKT"))
+          if (isUnmodifiableField(attribute) || ( !includeCoreAttributes && isCoreLocationField(attribute) ) || attribute.equalsIgnoreCase("asWKT"))
           {
             return;
           }

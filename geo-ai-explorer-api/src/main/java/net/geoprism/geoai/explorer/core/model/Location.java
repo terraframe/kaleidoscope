@@ -5,6 +5,8 @@ import java.util.Map;
 
 import org.locationtech.jts.geom.Geometry;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import tools.jackson.databind.annotation.JsonSerialize;
 
 import lombok.Data;

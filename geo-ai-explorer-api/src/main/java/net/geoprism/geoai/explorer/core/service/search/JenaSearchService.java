@@ -9,19 +9,14 @@ import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdfconnection.RDFConnection;
-import org.apache.jena.rdfconnection.RDFConnectionRemote;
-import org.apache.jena.rdfconnection.RDFConnectionRemoteBuilder;
 import org.apache.jena.sparql.util.FmtUtils;
 import org.locationtech.jts.geom.Geometry;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
-import net.geoprism.geoai.explorer.core.config.AppProperties;
 import net.geoprism.geoai.explorer.core.model.Location;
 import net.geoprism.geoai.explorer.core.model.LocationPage;
-import net.geoprism.geoai.explorer.core.service.GraphQueryService;
 
 /**
  * Uses Jena to provide the full text lookup capabilities
@@ -31,30 +26,31 @@ import net.geoprism.geoai.explorer.core.service.GraphQueryService;
 @ConditionalOnProperty(name = "explorer.search", havingValue = "jena")
 public class JenaSearchService extends BasicSearchService
 {
-  
+
   protected String getSparqlQuery()
   {
     return """
-      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-      PREFIX text: <http://jena.apache.org/text#>
-      PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-      PREFIX lpg: <%s>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX text: <http://jena.apache.org/text#>
+        PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+        PREFIX lpg: <%s>
 
-      SELECT ?uri ?type ?code ?label ?wkt
-      FROM <%s>
-      WHERE {
-        (?uri ?score) text:query (rdfs:label ?query) .
-        ?uri lpg:GeoObject-code ?code .
-        ?uri rdfs:label ?label .
-        ?uri a ?type .
-        OPTIONAL {
-            ?uri geo:hasGeometry ?g .
-            ?g geo:asWKT ?wkt .
+        SELECT ?uri ?type ?code ?label ?wkt
+        FROM <%s>
+        WHERE {
+          (?uri ?score) text:query (rdfs:label ?query) .
+          ?uri lpg:GeoObject-code ?code .
+          ?uri rdfs:label ?label .
+          ?uri a ?type .
+          OPTIONAL {
+              ?uri geo:hasGeometry ?g .
+              ?g geo:asWKT ?wkt .
+          }
         }
-      }
-      ORDER BY DESC(?score)
-            """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
+        ORDER BY DESC(?score)
+              """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
   }
+
 
   public LocationPage fullTextLookup(String query, int offset, int limit)
   {
@@ -64,6 +60,10 @@ public class JenaSearchService extends BasicSearchService
     {
       var sparql = getSparqlQuery();
       sparql += " LIMIT " + limit + " OFFSET " + offset;
+
+      System.out.println("JenaSearchService.fullTextLookup - EXECUTING QUERY");
+      System.out.println(sparql);
+      System.out.println();
 
       // Use ParameterizedSparqlString to inject the URI safely
       ParameterizedSparqlString pss = new ParameterizedSparqlString();
@@ -102,4 +102,5 @@ public class JenaSearchService extends BasicSearchService
 
     return page;
   }
+
 }

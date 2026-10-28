@@ -1,6 +1,5 @@
 package net.geoprism.geoai.explorer.core.service.prompt;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
