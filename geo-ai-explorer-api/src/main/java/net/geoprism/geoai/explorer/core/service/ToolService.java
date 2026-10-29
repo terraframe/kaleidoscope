@@ -7,6 +7,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import net.geoprism.geoai.explorer.core.model.NameResolutionResult;
 import net.geoprism.geoai.explorer.core.service.search.BasicSearchService;
 import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessTool;
@@ -92,7 +93,7 @@ public class ToolService
     {
       String name = argsNode.get(NAME_PARAM).asString("");
 
-      List<Map<String, Object>> results = this.search.nameResolution(name);
+      List<NameResolutionResult> results = this.search.nameResolution(name);
 
       return JsonMapper.shared().writeValueAsString(results);
     }

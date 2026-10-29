@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import net.geoprism.geoai.explorer.core.config.AppProperties;
 import net.geoprism.geoai.explorer.core.model.Location;
 import net.geoprism.geoai.explorer.core.model.LocationPage;
+import net.geoprism.geoai.explorer.core.model.NameResolutionResult;
 import net.geoprism.geoai.explorer.core.service.GraphQueryService;
 
 /**
@@ -26,32 +27,32 @@ import net.geoprism.geoai.explorer.core.service.GraphQueryService;
 public class BasicSearchService
 {
   @Autowired
-  protected GraphQueryService  graph;
-  
+  protected GraphQueryService graph;
+
   @Autowired
-  protected AppProperties properties;
-  
+  protected AppProperties     properties;
+
   protected String getSparqlQuery()
   {
     return """
-      SELECT ?uri ?type ?code ?label ?wkt
-      FROM <%s>
-      WHERE {
-        ?uri lpgs:GeoObject-code ?code .
-        ?uri rdfs:label ?label .
-        ?uri a ?type .
+        SELECT ?uri ?type ?code ?label ?wkt
+        FROM <%s>
+        WHERE {
+          ?uri lpgs:GeoObject-code ?code .
+          ?uri rdfs:label ?label .
+          ?uri a ?type .
 
-        FILTER(CONTAINS(LCASE(STR(?label)), LCASE(STR(?query))))
+          FILTER(CONTAINS(LCASE(STR(?label)), LCASE(STR(?query))))
 
-        OPTIONAL {
-          ?uri geo:hasGeometry ?g .
-          ?g geo:asWKT ?wkt .
+          OPTIONAL {
+            ?uri geo:hasGeometry ?g .
+            ?g geo:asWKT ?wkt .
+          }
         }
-      }
-      ORDER BY ASC(?label)
-            """.formatted(properties.getSparqlGraph());
+        ORDER BY ASC(?label)
+              """.formatted(properties.getSparqlGraph());
   }
-  
+
   protected String getNameResolutionQuery()
   {
     return """
@@ -71,7 +72,6 @@ public class BasicSearchService
           LIMIT 100 OFFSET 0
         """.formatted(properties.getLpgPrefix(), properties.getSparqlGraph());
   }
-
 
   public LocationPage fullTextLookup(String query, int offset, int limit)
   {
@@ -115,10 +115,10 @@ public class BasicSearchService
       return page;
     }
   }
-  
-  public List<Map<String, Object>> nameResolution(String query)
+
+  public List<NameResolutionResult> nameResolution(String query)
   {
-    List<Map<String, Object>> results = new ArrayList<Map<String, Object>>();
+    List<NameResolutionResult> results = new ArrayList<NameResolutionResult>();
 
     try (RDFConnection conn = graph.createConnection())
     {
@@ -147,7 +147,7 @@ public class BasicSearchService
           String code = qs.getLiteral("code").getString();
           String label = qs.getLiteral("label").getString();
 
-          results.add(Map.of("uri", uri, "type", type, "code", code, "label", label));
+          results.add(new NameResolutionResult(uri, type, code, label));
         }
       }
     }
