@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.geoprism.geoai.explorer.core.model.NameResolutionResult;
+import net.geoprism.geoai.explorer.core.model.ToolResponse;
 import net.geoprism.geoai.explorer.core.service.search.BasicSearchService;
 import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.services.bedrockagentcore.model.HarnessTool;
@@ -77,17 +78,20 @@ public class ToolService
     return tools;
   }
 
-  public String execute(String toolName, JsonNode argsNode)
+  public ToolResponse execute(String toolName, JsonNode argsNode)
   {
     if (SPARQL_TOOL.equals(toolName))
     {
       String statement = argsNode.get(SPARQL_PARAM).asString("");
 
+      // TODO: Handle size limit
       List<Map<String, Object>> results = this.queryService.select(statement);
 
-      // TODO: Handle size limit
-
-      return JsonMapper.shared().writeValueAsString(results);
+      return ToolResponse.builder() //
+          .name(toolName) //
+          .statement(statement) //
+          .text(JsonMapper.shared().writeValueAsString(results)) //
+          .build();
     }
     else if (RESOLUTION_TOOL.equals(toolName))
     {
@@ -95,10 +99,13 @@ public class ToolService
 
       List<NameResolutionResult> results = this.search.nameResolution(name);
 
-      return JsonMapper.shared().writeValueAsString(results);
+      return ToolResponse.builder() //
+          .name(toolName) //
+          .text(JsonMapper.shared().writeValueAsString(results)) //
+          .build();
     }
 
-    return "";
+    throw new UnsupportedOperationException("Unknown tool request [" + toolName + "]");
   }
 
 }

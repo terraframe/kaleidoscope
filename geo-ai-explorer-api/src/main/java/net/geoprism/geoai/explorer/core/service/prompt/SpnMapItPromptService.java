@@ -1,6 +1,5 @@
 package net.geoprism.geoai.explorer.core.service.prompt;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -147,7 +146,7 @@ public class SpnMapItPromptService extends MapItPromptService
         FloodScenario -> HasFloodRisk -> LandParcel
         Structure -> LocatedIn -> LandParcel
         
-        If the user asks about what Inundation scenarios are available, query obj:FloodScenario and return the results (along with #mapit).
+        If the user asks about what Inundation scenarios are available, query obj:FloodScenario and return the results.
               """;
   }
   

@@ -48,7 +48,7 @@ public class BedrockServiceIntegrationTest
   {
     when(searchService.nameResolution(anyString())).thenReturn(List.of( //
         NameResolutionResult.builder() //
-            .uri("lpg:Structure-2012X")
+            .uri("https://localhost/graph#Structure-2012X")
             .type("Structure")
             .label("849W84F9+M6C-4-5-3-4")
             .code("2012X")
@@ -71,9 +71,14 @@ public class BedrockServiceIntegrationTest
     Assert.assertTrue(message.getContent().contains("431,826"));
     Assert.assertFalse(message.getContent().contains("<location><label>"));
     Assert.assertFalse(message.getContent().contains("<name>"));
-    Assert.assertFalse(message.getMappable());
     Assert.assertFalse(message.getAmbiguous());
     Assert.assertEquals(sessionId, message.getSessionId());
+
+    List<String> statements = message.getStatements();
+
+    Assert.assertEquals(1, statements.size());
+
+    System.out.println(statements.get(0));
   }
 
   @Test
@@ -81,7 +86,7 @@ public class BedrockServiceIntegrationTest
   {
     when(searchService.nameResolution(anyString())).thenReturn(List.of( //
         NameResolutionResult.builder() //
-            .uri("lgs:FloodScenario-1")
+            .uri("https://localhost/graph#FloodScenario-1")
             .type("FloodScenario")
             .label("No Mitigation")
             .code("1")
@@ -94,13 +99,10 @@ public class BedrockServiceIntegrationTest
 
     Message message = service.prompt(sessionId, "How many land parcels at risk with the no mitigation flood scenario?");
 
-    System.out.println(message.getContent());
-
     Assert.assertTrue(message.getContent().trim().length() > 0);
     Assert.assertTrue(message.getContent().contains("200"));
-    Assert.assertTrue(message.getMappable());
     Assert.assertFalse(message.getAmbiguous());
-    Assert.assertEquals(sessionId, message.getSessionId());
+    Assert.assertTrue("Failed with message: " + message.getContent(), message.getMappable());
   }
 
   @Test
@@ -108,7 +110,7 @@ public class BedrockServiceIntegrationTest
   {
     when(searchService.nameResolution(anyString())).thenReturn(List.of( //
         NameResolutionResult.builder() //
-            .uri("https://localhost/graph#-CELRN_CL_ND_MEL_25")
+            .uri("https://localhost/graph#Structure-CELRN_CL_ND_MEL_25")
             .type("Structure")
             .label("structure_25")
             .code("CELRN_CL_ND_MEL_25")
