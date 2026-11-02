@@ -63,6 +63,27 @@ public class BedrockService
   {
   }
 
+  private record ToolExecution(ToolCall call, HarnessToolUseStatus status, ToolResponse response)
+  {
+    HarnessContentBlock toContentBlock()
+    {
+      return HarnessContentBlock.builder() //
+          .toolResult(HarnessToolResultBlock.builder() //
+              .toolUseId(call.toolUseId()) //
+              .type(HarnessToolUseType.TOOL_USE) //
+              .status(status) //
+              .content(HarnessToolResultContentBlock.builder() //
+                  .text(response.getText()) //
+                  .build())
+              .build())
+          .build();
+    }
+  }
+
+  private record HarnessResult(String text, List<ToolResponse> toolResponses)
+  {
+  }
+
   private static class HarnessTurn
   {
     final StringBuilder          text             = new StringBuilder();
@@ -87,27 +108,6 @@ public class BedrockService
 
   @Autowired
   private ToolService        toolService;
-
-  private record ToolExecution(ToolCall call, HarnessToolUseStatus status, ToolResponse response)
-  {
-    HarnessContentBlock toContentBlock()
-    {
-      return HarnessContentBlock.builder() //
-          .toolResult(HarnessToolResultBlock.builder() //
-              .toolUseId(call.toolUseId()) //
-              .type(HarnessToolUseType.TOOL_USE) //
-              .status(status) //
-              .content(HarnessToolResultContentBlock.builder() //
-                  .text(response.getText()) //
-                  .build())
-              .build())
-          .build();
-    }
-  }
-
-  private record HarnessResult(String text, List<ToolResponse> toolResponses)
-  {
-  }
 
   public Message prompt(String sessionId, String inputText) throws InterruptedException, ExecutionException, TimeoutException
   {
@@ -175,7 +175,8 @@ public class BedrockService
         harnessSessionId, //
         chatPromptService.getPrompt(), //
         inputText, //
-        model, toolService.getDefinitions());
+        model, //
+        toolService.getDefinitions());
 
     PromptResponse response = JsonMapper.shared().readerFor(PromptResponse.class).readValue(result.text);
 
@@ -183,7 +184,6 @@ public class BedrockService
 
     // String reasoning = extractReasoning(value);
     // value = stripReasoning(value);
-
 
     // boolean mappable = value.contains("#mapit");
     //
@@ -224,7 +224,8 @@ public class BedrockService
         UUID.randomUUID().toString(), //
         mapItPromptService.getPrompt(), //
         text, //
-        null, new LinkedList<>()).text();
+        null, // No custom model needed
+        new LinkedList<>()).text();
 
     /*
      * Retaining the workaround from the old implementation.
@@ -444,9 +445,15 @@ public class BedrockService
   {
     Duration timeout = Duration.ofMinutes(MAX_TIMEOUT_MINUTES);
 
-    return BedrockAgentCoreAsyncClient.builder().region(properties.getBedrockRegion()).credentialsProvider(properties.getCredentialsProvider()).httpClientBuilder(NettyNioAsyncHttpClient.builder().readTimeout(timeout)).overrideConfiguration(configuration -> {
-      configuration.apiCallTimeout(timeout);
-      configuration.apiCallAttemptTimeout(timeout);
-    }).build();
+    return BedrockAgentCoreAsyncClient.builder() //
+        .region(properties.getBedrockRegion()) //
+        .credentialsProvider(properties.getCredentialsProvider()) //
+        .httpClientBuilder(NettyNioAsyncHttpClient.builder() //
+            .readTimeout(timeout)) //
+        .overrideConfiguration(configuration -> {
+          configuration.apiCallTimeout(timeout);
+          configuration.apiCallAttemptTimeout(timeout);
+        })
+        .build();
   }
 }
