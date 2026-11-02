@@ -5,7 +5,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
@@ -23,12 +22,12 @@ public class AppProperties
   {
     return env.getProperty("sparql.graph", "https://spn.geoprism.net/spn");
   }
-  
+
   public String getLpgPrefix()
   {
     return env.getProperty("sparql.objectPrefix", "https://spn.geoprism.net#");
   }
-  
+
   public String getChatAgentHarnessArn()
   {
     return env.getProperty("bedrock.chat.agent.harnessArn");
@@ -51,10 +50,7 @@ public class AppProperties
 
   public Region getBedrockRegion()
   {
-    String configured = getFirstNonBlankProperty(
-		"aws.region",
-        "bedrock.region"
-    );
+    String configured = getFirstNonBlankProperty("aws.region", "bedrock.region");
 
     if (configured != null && !configured.isBlank())
     {
@@ -64,12 +60,14 @@ public class AppProperties
     return DefaultAwsRegionProviderChain.builder().build().getRegion();
   }
 
+  public String getBedrockModel()
+  {
+    return env.getProperty("bedrock.model", "us.openai.gpt-6.1-sol");
+  }
+
   public Region getNeptuneRegion()
   {
-    String configured = getFirstNonBlankProperty(
-		"aws.region",
-        "neptune.region"
-    );
+    String configured = getFirstNonBlankProperty("aws.region", "neptune.region");
 
     if (configured != null && !configured.isBlank())
     {
@@ -83,7 +81,7 @@ public class AppProperties
   {
     return env.getProperty("sparql.url");
   }
-  
+
   public String getOpenSearchScheme()
   {
     return env.getProperty("opensearch.scheme", "https");
@@ -103,18 +101,15 @@ public class AppProperties
   {
     return env.getProperty("opensearch.index");
   }
-  
+
   public boolean isOpenSearchIam()
   {
     return Boolean.parseBoolean(env.getProperty("opensearch.iam", "false"));
   }
-  
+
   public Region getOpenSearchRegion()
   {
-    String configured = getFirstNonBlankProperty(
-		"aws.region",
-        "opensearch.region"
-    );
+    String configured = getFirstNonBlankProperty("aws.region", "opensearch.region");
 
     if (configured != null && !configured.isBlank())
     {
@@ -123,46 +118,23 @@ public class AppProperties
 
     return DefaultAwsRegionProviderChain.builder().build().getRegion();
   }
-  
+
   public AwsCredentialsProvider getCredentialsProvider()
   {
-    String accessKeyId = getFirstNonBlankProperty(
-        "aws.access-key-id",
-        "aws.accessKeyId",
-        "aws.access_key_id"
-    );
+    String accessKeyId = getFirstNonBlankProperty("aws.access-key-id", "aws.accessKeyId", "aws.access_key_id");
 
-    String secretAccessKey = getFirstNonBlankProperty(
-        "aws.secret-access-key",
-        "aws.secretAccessKey",
-        "aws.secret_access_key"
-    );
+    String secretAccessKey = getFirstNonBlankProperty("aws.secret-access-key", "aws.secretAccessKey", "aws.secret_access_key");
 
-    String sessionToken = getFirstNonBlankProperty(
-        "aws.session-token",
-        "aws.sessionToken",
-        "aws.session_token"
-    );
+    String sessionToken = getFirstNonBlankProperty("aws.session-token", "aws.sessionToken", "aws.session_token");
 
     if (isNotBlank(accessKeyId) && isNotBlank(secretAccessKey))
     {
       if (isNotBlank(sessionToken))
       {
-        return StaticCredentialsProvider.create(
-            AwsSessionCredentials.create(
-                accessKeyId.trim(),
-                secretAccessKey.trim(),
-                sessionToken.trim()
-            )
-        );
+        return StaticCredentialsProvider.create(AwsSessionCredentials.create(accessKeyId.trim(), secretAccessKey.trim(), sessionToken.trim()));
       }
 
-      return StaticCredentialsProvider.create(
-          AwsBasicCredentials.create(
-              accessKeyId.trim(),
-              secretAccessKey.trim()
-          )
-      );
+      return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKeyId.trim(), secretAccessKey.trim()));
     }
 
     return DefaultCredentialsProvider.create();

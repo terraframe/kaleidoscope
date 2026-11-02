@@ -9,8 +9,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -55,13 +53,15 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class BedrockService
 {
-  private static final int MAX_TOOL_ROUNDS = 10;
+  private static final Logger log                 = LoggerFactory.getLogger(BedrockService.class);
+
+  private static final int    MAX_TOOL_ROUNDS     = 10;
+
+  private static final int    MAX_TIMEOUT_MINUTES = 5;
 
   private record ToolCall(String toolUseId, String name, StringBuilder input)
   {
   }
-
-  private static final int MAX_TIMEOUT_MINUTES = 5;
 
   private static class HarnessTurn
   {
@@ -76,23 +76,17 @@ public class BedrockService
     volatile String              finalMessage     = "";
   }
 
-  private static final Logger  log                   = LoggerFactory.getLogger(BedrockService.class);
-
-  private static final Pattern LOCATION_NAME_PATTERN = Pattern.compile(".*<name>(.*?)<\\/name>.*", Pattern.DOTALL);
-
-  private static final Pattern REASONING_PATTERN     = Pattern.compile("<reasoning\\b[^>]*>(.*?)</reasoning\\s*>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+  @Autowired
+  private AppProperties      properties;
 
   @Autowired
-  private AppProperties        properties;
+  private ChatPromptService  chatPromptService;
 
   @Autowired
-  private ChatPromptService    chatPromptService;
+  private MapItPromptService mapItPromptService;
 
   @Autowired
-  private MapItPromptService   mapItPromptService;
-
-  @Autowired
-  private ToolService          toolService;
+  private ToolService        toolService;
 
   private record ToolExecution(ToolCall call, HarnessToolUseStatus status, ToolResponse response)
   {
@@ -158,7 +152,7 @@ public class BedrockService
 
     HarnessModelConfiguration model = HarnessModelConfiguration.builder() //
         .bedrockModelConfig(HarnessBedrockModelConfig.builder() //
-            .modelId("us.openai.gpt-6.1-sol") //
+            .modelId(properties.getBedrockModel()) //
             .apiFormat(HarnessBedrockApiFormat.CONVERSE_STREAM) //
             .additionalParams(Document.mapBuilder() //
                 .putDocument("additionalModelRequestFields", Document.mapBuilder() //
@@ -190,9 +184,6 @@ public class BedrockService
     // String reasoning = extractReasoning(value);
     // value = stripReasoning(value);
 
-    Matcher matcher = LOCATION_NAME_PATTERN.matcher(value);
-
-    boolean locationFound = matcher.find();
 
     // boolean mappable = value.contains("#mapit");
     //
@@ -218,29 +209,7 @@ public class BedrockService
         .filter(s -> StringUtils.isNotBlank(s))
         .toList());
 
-    if (locationFound)
-    {
-      message.setLocation(matcher.group(1));
-    }
-
     return message;
-  }
-
-  private String extractReasoning(String response)
-  {
-    Matcher matcher = REASONING_PATTERN.matcher(response);
-
-    if (matcher.find())
-    {
-      return matcher.group(1).trim();
-    }
-
-    return null;
-  }
-
-  private String stripReasoning(String response)
-  {
-    return REASONING_PATTERN.matcher(response).replaceAll("").trim();
   }
 
   public String getLocationSparql(History history) throws InterruptedException, ExecutionException, TimeoutException
