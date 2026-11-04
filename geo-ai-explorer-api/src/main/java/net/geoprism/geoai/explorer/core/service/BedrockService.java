@@ -24,6 +24,7 @@ import net.geoprism.geoai.explorer.core.model.PromptResponse;
 import net.geoprism.geoai.explorer.core.model.ToolResponse;
 import net.geoprism.geoai.explorer.core.service.prompt.ChatPromptService;
 import net.geoprism.geoai.explorer.core.service.prompt.MapItPromptService;
+import net.geoprism.geoai.explorer.core.service.prompt.ReportPromptService;
 import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreAsyncClient;
@@ -98,16 +99,19 @@ public class BedrockService
   }
 
   @Autowired
-  private AppProperties      properties;
+  private AppProperties       properties;
 
   @Autowired
-  private ChatPromptService  chatPromptService;
+  private ChatPromptService   chatPromptService;
 
   @Autowired
-  private MapItPromptService mapItPromptService;
+  private MapItPromptService  mapItPromptService;
 
   @Autowired
-  private ToolService        toolService;
+  private ReportPromptService reportPromptService;
+
+  @Autowired
+  private ToolService         toolService;
 
   public Message prompt(String sessionId, String inputText) throws InterruptedException, ExecutionException, TimeoutException
   {
@@ -176,7 +180,7 @@ public class BedrockService
         chatPromptService.getPrompt(), //
         inputText, //
         model, //
-        toolService.getPromptDefinitions());
+        toolService.getPromptTools());
 
     PromptResponse response = JsonMapper.shared().readerFor(PromptResponse.class).readValue(result.text);
 
@@ -226,6 +230,25 @@ public class BedrockService
         text, //
         null, // No custom model needed
         new LinkedList<>()).text();
+
+    /*
+     * Retaining the workaround from the old implementation.-
+     */
+    response = response.replace("<REDACTED>", "sparql");
+
+    return stripCodeFence(response);
+  }
+
+  public String report(String sessionId, String inputText) throws InterruptedException, ExecutionException, TimeoutException
+  {
+    String response = invokeHarness( //
+        properties.getSparqlAgentHarnessArn(), //
+        properties.getSparqlAgentHarnessEndpoint(), //
+        UUID.randomUUID().toString(), //
+        reportPromptService.getPrompt(), //
+        inputText, //
+        null, // No custom model needed
+        toolService.getReportTools()).text();
 
     /*
      * Retaining the workaround from the old implementation.-

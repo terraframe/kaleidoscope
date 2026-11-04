@@ -114,7 +114,7 @@ public class ToolServiceTest extends MockDataTest
   @Test
   public void testGetNameResolutionToolDefinition_IncludedInPromptDefinitions()
   {
-    List<HarnessTool> tools = service.getPromptDefinitions();
+    List<HarnessTool> tools = service.getPromptTools();
 
     assertTrue(tools.contains(service.getNameResolutionToolDefinition()));
   }
@@ -173,7 +173,7 @@ public class ToolServiceTest extends MockDataTest
   @Test
   public void testGetQueryToolDefinition_IncludedInPromptDefinitions()
   {
-    List<HarnessTool> tools = service.getPromptDefinitions();
+    List<HarnessTool> tools = service.getPromptTools();
 
     assertTrue(tools.contains(service.getQueryToolDefinition()));
   }
@@ -223,7 +223,7 @@ public class ToolServiceTest extends MockDataTest
   @Test
   public void testGetListSnippetsToolDefinition_NameAndType()
   {
-    HarnessTool tool = service.getListSnippetsToolDefinition();
+    HarnessTool tool = service.getListDiscoveryToolDefinition();
 
     assertEquals(ToolService.LIST_DISCOVERIES_TOOL, tool.name());
     assertEquals(HarnessToolType.INLINE_FUNCTION, tool.type());
@@ -232,7 +232,7 @@ public class ToolServiceTest extends MockDataTest
   @Test
   public void testGetListSnippetsToolDefinition_Description()
   {
-    HarnessInlineFunctionConfig function = getInlineFunction(service.getListSnippetsToolDefinition());
+    HarnessInlineFunctionConfig function = getInlineFunction(service.getListDiscoveryToolDefinition());
 
     assertEquals("Returns a list of approved report snippets for the a project", function.description());
   }
@@ -240,7 +240,7 @@ public class ToolServiceTest extends MockDataTest
   @Test
   public void testGetListSnippetsToolDefinition_InputSchema()
   {
-    Document schema = getInlineFunction(service.getListSnippetsToolDefinition()).inputSchema();
+    Document schema = getInlineFunction(service.getListDiscoveryToolDefinition()).inputSchema();
 
     assertNotNull(schema);
     assertTrue(schema.isMap());
@@ -274,7 +274,7 @@ public class ToolServiceTest extends MockDataTest
         service.getQueryToolDefinition().name(), //
         service.getNameResolutionToolDefinition().name(), //
         service.getListProjectsToolDefinition().name(), //
-        service.getListSnippetsToolDefinition().name() //
+        service.getListDiscoveryToolDefinition().name() //
     );
 
     assertEquals(names.size(), names.stream().distinct().count(), "Tool names must be unique: " + names);
