@@ -19,7 +19,7 @@ public class ReportTemplateService
             .name("National Economic Development (NED) Analysis") //
             .summary("""
                   The purpose of this section is to compare and contrast different alternative plans or flood scenarios for
-                   their cost effectiveness, measured in terms of net benefits
+                   their cost effectiveness at a national level, measured in terms of net benefits.
                 """) //
             .example("""
                    The final array alternatives were evaluated for their cost effectiveness, measured in terms of net benefits,
@@ -31,7 +31,28 @@ public class ReportTemplateService
                    (OMRR&R). Expected annual damages were estimated using the HEC-FDA computer program. Net
                    benefit computations for the focused array were evaluated based on October 2023 price levels.
                 """)
-            .build()))
+            .build(),
+            Section.builder() //
+                .name("Regional Economic Development (RED) Analysis") //
+                .summary("""
+                      The purpose of this section is to compare and contrast different alternative plans or flood scenarios number of jobs
+                      for number of jobs and  other economic measures such as labor income, value added, and sales that are supported by future
+                      implementation of alternative plans
+                    """) //
+                .example("""
+                    The RED analysis estimates number of jobs and other economic measures such as labor income, value
+                    added, and sales that are supported by future implementation of alternative plans. The team completed
+                    modeling to evaluate the regional economic impact and project expenditures, activities, and infrastructure.
+                    The results of this analysis are presented in Table 23Table and Table 24, and Appendix B provides
+                    additional details.
+
+                    Construction costs were used to estimate the regional economic impacts of all alternatives in Santa Clara
+                    County. Generally, the higher the cost of construction, the higher the RED benefits for that alternative.
+                    Table 23 shows the construction costs for all plans. The Bypass Plan (Alt 3b) produces the highest
+                    amount of output ($373.1 M), followed by the Nonstructural Plan (alt 4) ($304.6 M), the Valley View
+                    Plan (Alt 2b) ($233.7 M), the Combination Plan (Alt 8b) ($83.9 M), and the Lower Scope Plan (Alt 7)
+                    (59.4 M) (Table 24). Table 24 shows a comparison of RED results for all plans.                    """)
+                .build()))
         .build();
     return plan;
   }

@@ -71,19 +71,50 @@ public class ReportGenerationIntegrationTest extends MockDataTest
             """)
         .build();
 
+    Discovery output = Discovery.builder() //
+        .id(3L) //
+        .project(project) //
+        .name("Estimated cost output of scenarios") //
+        .description("Comparison of the estimated cost output for each scenario") //
+        .text("""
+            2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) - $233.7M
+            3b – Modified Bypass Plan (previous authorized plan, partially constructed) - $373.1M
+            4 - Nonstructural Plan - $304.6M
+            7 – Low Scope Plan - $59.4M
+            8b – Combination Plan - $83.9M
+            """)
+        .build();
+
+    Discovery jobs = Discovery.builder() //
+        .id(4L) //
+        .project(project) //
+        .name("Estimated job creation of scenarios") //
+        .description("Comparison of the estimated job creation for each scenario") //
+        .text("""
+            2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) - 1543.5
+            3b – Modified Bypass Plan (previous authorized plan, partially constructed) - 2463.3
+            4 - Nonstructural Plan - 2011
+            7 – Low Scope Plan - 392.8
+            8b – Combination Plan - 554.5
+            """)
+        .build();
+
     when(projectService.fetchList()).thenReturn(List.of(project));
 
-    when(discoveryService.fetchListByProject(anyLong())).thenReturn(List.of(cost, benefits));
+    when(discoveryService.fetchListByProject(anyLong())).thenReturn(List.of(cost, benefits, output, jobs));
     when(discoveryService.findById(1L)).thenReturn(Optional.of(cost));
     when(discoveryService.findById(2L)).thenReturn(Optional.of(benefits));
+    when(discoveryService.findById(3L)).thenReturn(Optional.of(output));
+    when(discoveryService.findById(4L)).thenReturn(Optional.of(jobs));
   }
 
   @Test
   public void testReportGeneration() throws InterruptedException, ExecutionException, TimeoutException
   {
     String input = """
-            Generate a report using template 'PLAN_EVAL' for project 1 where discoveries 1 and 2
-            are used in the National Economic Development (NED) Analysis section
+            Generate a report using template 'PLAN_EVAL' for project 1.  Use discoveries 1 and 2
+            in the National Economic Development (NED) Analysis section. Use discoveries
+            3 and 4 in the Regional Economic Development (RED) Analysis section.
         """;
 
     String sessionId = UUID.randomUUID().toString();
