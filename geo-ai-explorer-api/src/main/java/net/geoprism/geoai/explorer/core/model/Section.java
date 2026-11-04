@@ -7,9 +7,17 @@ import lombok.Data;
 @Builder
 public class Section
 {
-  private String name;
+  private String  name;
 
-  private String summary;
+  private String  summary;
 
-  private String example;
+  private String  example;
+
+  /**
+   * Whether the section is expected in every report built from the template.
+   * Optional sections may be omitted when no relevant discoveries are assigned
+   * or when they do not apply to the study type.
+   */
+  @Builder.Default
+  private boolean required = true;
 }

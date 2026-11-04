@@ -14,6 +14,18 @@ public class ReportTemplate
 
   private String        name;
 
+  /**
+   * Citation of the federal regulation (or agency guidance) that defines the
+   * requirements this template's sections satisfy, e.g. "33 CFR Part 234,
+   * §234.9 Evaluate effects of alternatives".
+   */
+  private String        regulation;
+
+  /**
+   * Link to the authoritative text of {@link #regulation}.
+   */
+  private String        regulationUrl;
+
   @Builder.Default
   private List<Section> sections = new LinkedList<>();
 }
