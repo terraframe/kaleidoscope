@@ -19,7 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import net.geoprism.geoai.explorer.core.config.TestConfiguration;
-import net.geoprism.geoai.explorer.core.entity.Discovery;
+import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.entity.Project;
 import net.geoprism.geoai.explorer.core.mock.MockDataTest;
 
@@ -36,14 +36,14 @@ public class ReportGenerationIntegrationTest extends MockDataTest
   private ProjectService   projectService;
 
   @MockitoBean
-  private DiscoveryService discoveryService;
+  private FactService discoveryService;
 
   @BeforeEach
   public void setUp()
   {
     Project project = createProject(1L, "Upper Guadalupe River");
 
-    Discovery cost = Discovery.builder() //
+    Fact cost = Fact.builder() //
         .id(1L) //
         .project(project) //
         .name("Average annual costs of scenarios") //
@@ -57,7 +57,7 @@ public class ReportGenerationIntegrationTest extends MockDataTest
             """)
         .build();
 
-    Discovery benefits = Discovery.builder() //
+    Fact benefits = Fact.builder() //
         .id(2L) //
         .project(project) //
         .name("Average annual benefits of scenarios") //
@@ -71,7 +71,7 @@ public class ReportGenerationIntegrationTest extends MockDataTest
             """)
         .build();
 
-    Discovery output = Discovery.builder() //
+    Fact output = Fact.builder() //
         .id(3L) //
         .project(project) //
         .name("Estimated cost output of scenarios") //
@@ -85,7 +85,7 @@ public class ReportGenerationIntegrationTest extends MockDataTest
             """)
         .build();
 
-    Discovery jobs = Discovery.builder() //
+    Fact jobs = Fact.builder() //
         .id(4L) //
         .project(project) //
         .name("Estimated job creation of scenarios") //
@@ -124,4 +124,17 @@ public class ReportGenerationIntegrationTest extends MockDataTest
     System.out.println(report);
   }
 
+  @Test
+  public void testFactSuggestions() throws InterruptedException, ExecutionException, TimeoutException
+  {
+    String input = """
+            Generate a report using template 'PLAN_EVAL' for project 1.  What facts are most appropriate for National Economic Development (NED) Analysis section?""";
+    
+    String sessionId = UUID.randomUUID().toString();
+    
+    String response = service.report(sessionId, input);
+    
+    System.out.println(response);
+  }
+  
 }

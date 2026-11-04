@@ -24,9 +24,9 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import net.geoprism.geoai.explorer.core.config.TestConfiguration;
 import net.geoprism.geoai.explorer.core.entity.Project;
-import net.geoprism.geoai.explorer.core.entity.Discovery;
+import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.mock.MockDataTest;
-import net.geoprism.geoai.explorer.core.repository.DiscoveryRepository;
+import net.geoprism.geoai.explorer.core.repository.FactRepository;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK, classes = TestConfiguration.class)
@@ -34,20 +34,20 @@ import net.geoprism.geoai.explorer.core.repository.DiscoveryRepository;
 public class DiscoveryServiceTest extends MockDataTest
 {
   @Autowired
-  private DiscoveryService    service;
+  private FactService    service;
 
   @MockitoBean
-  private DiscoveryRepository repository;
+  private FactRepository repository;
 
   @Test
   public void testSave()
   {
-    Discovery discovery = createDiscovery(null);
-    Discovery saved = createDiscovery(1L);
+    Fact discovery = createFact(null);
+    Fact saved = createFact(1L);
 
     when(repository.save(discovery)).thenReturn(saved);
 
-    Discovery result = service.save(discovery);
+    Fact result = service.save(discovery);
 
     assertSame(saved, result);
     verify(repository).save(discovery);
@@ -56,11 +56,11 @@ public class DiscoveryServiceTest extends MockDataTest
   @Test
   public void testFetchList()
   {
-    List<Discovery> discoverys = List.of(createDiscovery(1L), createDiscovery(2L));
+    List<Fact> discoverys = List.of(createFact(1L), createFact(2L));
 
     when(repository.findAll()).thenReturn(discoverys);
 
-    List<Discovery> result = service.fetchList();
+    List<Fact> result = service.fetchList();
 
     assertEquals(2, result.size());
     assertEquals(1L, result.get(0).getId());
@@ -79,11 +79,11 @@ public class DiscoveryServiceTest extends MockDataTest
   public void testFetchListByProject()
   {
     Project project = createProject(1L);
-    List<Discovery> discoveries = List.of(createDiscovery(1L, project), createDiscovery(2L, project));
+    List<Fact> discoveries = List.of(createFact(1L, project), createFact(2L, project));
 
     when(repository.findAllByProjectId(1L)).thenReturn(discoveries);
 
-    List<Discovery> result = service.fetchListByProject(1L);
+    List<Fact> result = service.fetchListByProject(1L);
 
     assertEquals(2, result.size());
     assertEquals(1L, result.get(0).getId());
@@ -103,14 +103,14 @@ public class DiscoveryServiceTest extends MockDataTest
   @Test
   public void testUpdate_NameAndDescription()
   {
-    Discovery existing = createDiscovery(1L);
+    Fact existing = createFact(1L);
 
     when(repository.findById(1L)).thenReturn(Optional.of(existing));
-    when(repository.save(any(Discovery.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(repository.save(any(Fact.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    Discovery changes = Discovery.builder().name("New Name").description("New Description").build();
+    Fact changes = Fact.builder().name("New Name").description("New Description").build();
 
-    Discovery result = service.update(changes, 1L);
+    Fact result = service.update(changes, 1L);
 
     assertEquals(1L, result.getId());
     assertEquals("New Name", result.getName());
@@ -118,7 +118,7 @@ public class DiscoveryServiceTest extends MockDataTest
     assertEquals("Some text", result.getText());
     assertEquals("SELECT * WHERE { ?s ?p ?o }", result.getStatements());
 
-    ArgumentCaptor<Discovery> captor = ArgumentCaptor.forClass(Discovery.class);
+    ArgumentCaptor<Fact> captor = ArgumentCaptor.forClass(Fact.class);
     verify(repository).save(captor.capture());
     assertSame(existing, captor.getValue());
   }
@@ -126,14 +126,14 @@ public class DiscoveryServiceTest extends MockDataTest
   @Test
   public void testUpdate_BlankFieldsAreIgnored()
   {
-    Discovery existing = createDiscovery(1L);
+    Fact existing = createFact(1L);
 
     when(repository.findById(1L)).thenReturn(Optional.of(existing));
-    when(repository.save(any(Discovery.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(repository.save(any(Fact.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    Discovery changes = Discovery.builder().name("  ").description(null).build();
+    Fact changes = Fact.builder().name("  ").description(null).build();
 
-    Discovery result = service.update(changes, 1L);
+    Fact result = service.update(changes, 1L);
 
     assertEquals("Original Name", result.getName());
     assertEquals("Original Description", result.getDescription());
@@ -144,10 +144,10 @@ public class DiscoveryServiceTest extends MockDataTest
   {
     when(repository.findById(99L)).thenReturn(Optional.empty());
 
-    Discovery changes = Discovery.builder().name("New Name").build();
+    Fact changes = Fact.builder().name("New Name").build();
 
     assertThrows(NoSuchElementException.class, () -> service.update(changes, 99L));
-    verify(repository, never()).save(any(Discovery.class));
+    verify(repository, never()).save(any(Fact.class));
   }
 
   @Test

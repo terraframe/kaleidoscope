@@ -13,31 +13,31 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import net.geoprism.geoai.explorer.core.entity.Discovery;
-import net.geoprism.geoai.explorer.core.service.DiscoveryService;
+import net.geoprism.geoai.explorer.core.entity.Fact;
+import net.geoprism.geoai.explorer.core.service.FactService;
 
 @RestController
 @Validated
 @RequestMapping("/api/snippet")
-public class ReportSnippetController
+public class FactController
 {
   @Autowired
-  private DiscoveryService service;
+  private FactService service;
 
   @PostMapping("/snippets")
-  public Discovery save(@RequestBody Discovery snippet)
+  public Fact save(@RequestBody Fact snippet)
   {
     return service.save(snippet);
   }
 
   @GetMapping("/snippets")
-  public List<Discovery> fetchList()
+  public List<Fact> fetchList()
   {
     return service.fetchList();
   }
 
   @PutMapping("/snippets/{id}")
-  public Discovery update(@RequestBody Discovery snippet, @PathVariable("id") Long id)
+  public Fact update(@RequestBody Fact snippet, @PathVariable("id") Long id)
   {
     return service.update(snippet, id);
   }
