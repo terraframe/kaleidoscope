@@ -96,7 +96,7 @@ public class ReportTemplateService
         .name("National Economic Development (NED) Analysis") //
         .summary("""
             The purpose of this section is to compare and contrast different alternative plans or flood scenarios for
-            their cost effectiveness (the P&G efficiency criterion), measured in terms of net benefits. For each
+            their cost effectiveness at a national level (the P&G efficiency criterion), measured in terms of net benefits. For each
             alternative, report average annual costs (construction plus OMRR&R), average annual benefits, net annual
             benefits (benefits minus costs) and the benefit-cost ratio, and identify the plan with the highest net
             benefits. State the modeling tool used for expected annual damages, the price level, the period of
