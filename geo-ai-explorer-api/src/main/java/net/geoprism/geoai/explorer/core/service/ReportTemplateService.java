@@ -2,9 +2,12 @@ package net.geoprism.geoai.explorer.core.service;
 
 import java.util.List;
 
+import org.springframework.stereotype.Service;
+
 import net.geoprism.geoai.explorer.core.model.ReportTemplate;
 import net.geoprism.geoai.explorer.core.model.Section;
 
+@Service
 public class ReportTemplateService
 {
   private ReportTemplate mock()
@@ -14,7 +17,10 @@ public class ReportTemplateService
         .name("Plan Evaluation") //
         .sections(List.of(Section.builder() //
             .name("National Economic Development (NED) Analysis") //
-            .summary("The purpose of this section is to compare and contrast different alternative plans or flood scenarios for their cost effectiveness, measured in terms of net benefits") //
+            .summary("""
+                  The purpose of this section is to compare and contrast different alternative plans or flood scenarios for
+                   their cost effectiveness, measured in terms of net benefits
+                """) //
             .example("""
                    The final array alternatives were evaluated for their cost effectiveness, measured in terms of net benefits,
                    calculated by subtracting the annual costs from the expected annual economic benefits (Table 21). The

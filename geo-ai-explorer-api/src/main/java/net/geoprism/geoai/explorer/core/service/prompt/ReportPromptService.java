@@ -1,9 +1,11 @@
 package net.geoprism.geoai.explorer.core.service.prompt;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import net.geoprism.geoai.explorer.core.config.AppProperties;
 
+@Service
 public class ReportPromptService
 {
   @Autowired

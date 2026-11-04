@@ -20,17 +20,19 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import net.geoprism.geoai.explorer.core.config.TestConfiguration;
+import net.geoprism.geoai.explorer.core.mock.MockDataTest;
 import net.geoprism.geoai.explorer.core.model.History;
 import net.geoprism.geoai.explorer.core.model.HistoryMessage;
 import net.geoprism.geoai.explorer.core.model.HistoryMessageType;
 import net.geoprism.geoai.explorer.core.model.Message;
 import net.geoprism.geoai.explorer.core.model.NameResolutionResult;
+import net.geoprism.geoai.explorer.core.repository.ProjectRepository;
 import net.geoprism.geoai.explorer.core.service.search.BasicSearchService;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK, classes = TestConfiguration.class)
 @AutoConfigureMockMvc
-public class BedrockServiceIntegrationTest
+public class BedrockServiceIntegrationTest extends MockDataTest
 {
 
   @Autowired
@@ -157,5 +159,4 @@ public class BedrockServiceIntegrationTest
     Assert.assertTrue(sparql.contains("?label"));
     Assert.assertTrue(sparql.contains("?wkt"));
   }
-
 }
