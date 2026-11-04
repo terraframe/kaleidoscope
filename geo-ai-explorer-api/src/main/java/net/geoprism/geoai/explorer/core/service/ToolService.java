@@ -8,7 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import net.geoprism.geoai.explorer.core.entity.Discovery;
+import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.entity.Project;
 import net.geoprism.geoai.explorer.core.model.NameResolutionResult;
 import net.geoprism.geoai.explorer.core.model.ReportTemplate;
@@ -23,29 +23,29 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class ToolService
 {
-  public static final String    QUERY_TOOL            = "query";
+  public static final String    QUERY_TOOL          = "query";
 
-  public static final String    RESOLUTION_TOOL       = "name_resolution";
+  public static final String    RESOLUTION_TOOL     = "name_resolution";
 
-  public static final String    LIST_PROJECT_TOOL     = "list_projects";
+  public static final String    LIST_PROJECT_TOOL   = "list_projects";
 
-  public static final String    LIST_TEMPLATES_TOOL   = "list_templates";
+  public static final String    LIST_TEMPLATES_TOOL = "list_templates";
 
-  public static final String    GET_TEMPLATE_TOOL     = "get_template";
+  public static final String    GET_TEMPLATE_TOOL   = "get_template";
 
-  public static final String    LIST_DISCOVERIES_TOOL = "list_discoveries";
+  public static final String    LIST_FACTS_TOOL     = "list_facts";
 
-  public static final String    GET_DISCOVERIES_TOOL  = "get_discovery";
+  public static final String    GET_FACTS_TOOL      = "get_fact";
 
-  public static final String    SPARQL_PARAM          = "sparql";
+  public static final String    SPARQL_PARAM        = "sparql";
 
-  public static final String    NAME_PARAM            = "name";
+  public static final String    NAME_PARAM          = "name";
 
-  public static final String    PROJECT_PARAM         = "project";
+  public static final String    PROJECT_PARAM       = "project";
 
-  public static final String    DISCOVERY_PARAM       = "discovery";
+  public static final String    FACT_PARAM          = "fact";
 
-  public static final String    TEMPLATE_PARAM        = "template";
+  public static final String    TEMPLATE_PARAM      = "template";
 
   @Autowired
   private GraphQueryService     queryService;
@@ -57,7 +57,7 @@ public class ToolService
   private ProjectService        projectService;
 
   @Autowired
-  private DiscoveryService      discoveryService;
+  private FactService           factService;
 
   @Autowired
   private ReportTemplateService templateService;
@@ -127,7 +127,7 @@ public class ToolService
     return tool;
   }
 
-  public HarnessTool getListDiscoveryToolDefinition()
+  public HarnessTool getListFactsToolDefinition()
   {
     Document sparqlSchema = Document.mapBuilder() //
         .putString("type", "object") //
@@ -142,9 +142,9 @@ public class ToolService
 
     HarnessTool tool = HarnessTool.builder() //
         .type(HarnessToolType.INLINE_FUNCTION) //
-        .name(LIST_DISCOVERIES_TOOL) //
+        .name(LIST_FACTS_TOOL) //
         .config(config -> config.inlineFunction(function -> function //
-            .description("Returns a list of approved report snippets for the a project") //
+            .description("Returns a list of approved report facts for the a project") //
             .inputSchema(sparqlSchema))) //
         .build();
     return tool;
@@ -169,7 +169,7 @@ public class ToolService
     return tool;
   }
 
-  public HarnessTool getGetDiscoveryToolDefinition()
+  public HarnessTool getGetDiscoveryFactDefinition()
   {
     Document sparqlSchema = Document.mapBuilder() //
         .putString("type", "object") //
@@ -179,14 +179,14 @@ public class ToolService
                 .putString("description", "ID of the discovery") //
                 .build()) //
             .build()) //
-        .putList("required", List.of(Document.fromString(DISCOVERY_PARAM))) //
+        .putList("required", List.of(Document.fromString(FACT_PARAM))) //
         .build();
 
     HarnessTool tool = HarnessTool.builder() //
         .type(HarnessToolType.INLINE_FUNCTION) //
-        .name(GET_DISCOVERIES_TOOL) //
+        .name(GET_FACTS_TOOL) //
         .config(config -> config.inlineFunction(function -> function //
-            .description("Returns a JSON serialized discovery for the given id") //
+            .description("Returns a JSON serialized fact for the given id") //
             .inputSchema(sparqlSchema))) //
         .build();
     return tool;
@@ -232,8 +232,8 @@ public class ToolService
     tools.add(getListProjectsToolDefinition());
     tools.add(getListTemplateToolDefinition());
     tools.add(getGetTemplateToolDefinition());
-    tools.add(getListDiscoveryToolDefinition());
-    tools.add(getGetDiscoveryToolDefinition());
+    tools.add(getListFactsToolDefinition());
+    tools.add(getGetDiscoveryFactDefinition());
 
     return tools;
   }
@@ -282,11 +282,11 @@ public class ToolService
           .text(JsonMapper.shared().writeValueAsString(projects)) //
           .build();
     }
-    else if (LIST_DISCOVERIES_TOOL.equals(toolName))
+    else if (LIST_FACTS_TOOL.equals(toolName))
     {
       long projectId = argsNode.get(PROJECT_PARAM).asLong(-1);
 
-      List<Map<String, Object>> discoveries = this.discoveryService.fetchListByProject(projectId).stream().map(s -> {
+      List<Map<String, Object>> discoveries = this.factService.fetchListByProject(projectId).stream().map(s -> {
         Map<String, Object> dto = Map.of( //
             "id", s.getId(), //
             "name", s.getName(), //
@@ -301,11 +301,11 @@ public class ToolService
           .text(JsonMapper.shared().writeValueAsString(discoveries)) //
           .build();
     }
-    else if (GET_DISCOVERIES_TOOL.equals(toolName))
+    else if (GET_FACTS_TOOL.equals(toolName))
     {
-      long id = argsNode.get(DISCOVERY_PARAM).asLong(-1);
+      long id = argsNode.get(FACT_PARAM).asLong(-1);
 
-      Discovery discovery = this.discoveryService.findById(id).orElseThrow();
+      Fact discovery = this.factService.findById(id).orElseThrow();
 
       return ToolResponse.builder() //
           .name(toolName) //

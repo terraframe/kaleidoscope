@@ -22,7 +22,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import jakarta.transaction.Transactional;
 import net.geoprism.geoai.explorer.core.config.TestConfiguration;
 import net.geoprism.geoai.explorer.core.entity.Project;
-import net.geoprism.geoai.explorer.core.entity.Discovery;
+import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.mock.MockDataTest;
 
 /**
@@ -33,10 +33,10 @@ import net.geoprism.geoai.explorer.core.mock.MockDataTest;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK, classes = TestConfiguration.class)
 @AutoConfigureMockMvc
 @Transactional
-public class DiscoveryRepositoryIntegrationTest extends MockDataTest
+public class FactRepositoryIntegrationTest extends MockDataTest
 {
   @Autowired
-  private DiscoveryRepository repository;
+  private FactRepository repository;
 
   @Autowired
   private ProjectRepository   projectRepository;
@@ -55,7 +55,7 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
   @Test
   public void testSave_GeneratesId()
   {
-    Discovery saved = repository.save(createDiscovery(null, project));
+    Fact saved = repository.save(createFact(null, project));
 
     assertNotNull(saved.getId());
     assertEquals("Original Name", saved.getName());
@@ -65,13 +65,13 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
   @Test
   public void testFindById()
   {
-    Discovery saved = repository.save(createDiscovery(null, project));
+    Fact saved = repository.save(createFact(null, project));
 
-    Optional<Discovery> result = repository.findById(saved.getId());
+    Optional<Fact> result = repository.findById(saved.getId());
 
     assertTrue(result.isPresent());
 
-    Discovery snippet = result.get();
+    Fact snippet = result.get();
 
     assertEquals(saved.getId(), snippet.getId());
     assertEquals("Original Name", snippet.getName());
@@ -91,11 +91,11 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
   @Test
   public void testFindAll()
   {
-    Discovery a = repository.save(createDiscovery(null, project));
-    Discovery b = repository.save(createDiscovery(null, project));
+    Fact a = repository.save(createFact(null, project));
+    Fact b = repository.save(createFact(null, project));
 
     List<Long> ids = StreamSupport.stream(repository.findAll().spliterator(), false) //
-        .map(Discovery::getId) //
+        .map(Fact::getId) //
         .toList();
 
     assertTrue(ids.contains(a.getId()));
@@ -105,13 +105,13 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
   @Test
   public void testUpdate()
   {
-    Discovery saved = repository.save(createDiscovery(null, project));
+    Fact saved = repository.save(createFact(null, project));
 
     saved.setName("New Name");
     saved.setDescription("New Description");
     repository.save(saved);
 
-    Discovery result = repository.findById(saved.getId()).orElseThrow();
+    Fact result = repository.findById(saved.getId()).orElseThrow();
 
     assertEquals("New Name", result.getName());
     assertEquals("New Description", result.getDescription());
@@ -121,7 +121,7 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
   @Test
   public void testDeleteById()
   {
-    Discovery saved = repository.save(createDiscovery(null, project));
+    Fact saved = repository.save(createFact(null, project));
 
     repository.deleteById(saved.getId());
 
@@ -134,8 +134,8 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
   {
     long before = repository.count();
 
-    repository.save(createDiscovery(null, project));
-    repository.save(createDiscovery(null, project));
+    repository.save(createFact(null, project));
+    repository.save(createFact(null, project));
 
     assertEquals(before + 2, repository.count());
   }
@@ -143,7 +143,7 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
   @Test
   public void testSave_NullProjectFails()
   {
-    assertThrows(DataIntegrityViolationException.class, () -> repository.save(createDiscovery(null, null)));
+    assertThrows(DataIntegrityViolationException.class, () -> repository.save(createFact(null, null)));
   }
 
   @Test
@@ -153,13 +153,13 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
     other.setName("Other Project");
     other = projectRepository.save(other);
 
-    Discovery a = repository.save(createDiscovery(null, project));
-    Discovery b = repository.save(createDiscovery(null, project));
-    Discovery c = repository.save(createDiscovery(null, other));
+    Fact a = repository.save(createFact(null, project));
+    Fact b = repository.save(createFact(null, project));
+    Fact c = repository.save(createFact(null, other));
 
     List<Long> ids = repository.findAllByProject(project)
         .stream() //
-        .map(Discovery::getId) //
+        .map(Fact::getId) //
         .toList();
 
     assertEquals(2, ids.size());
@@ -167,7 +167,7 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
     assertTrue(ids.contains(b.getId()));
     assertFalse(ids.contains(c.getId()));
 
-    List<Discovery> otherSnippets = repository.findAllByProject(other);
+    List<Fact> otherSnippets = repository.findAllByProject(other);
 
     assertEquals(1, otherSnippets.size());
     assertEquals(c.getId(), otherSnippets.get(0).getId());
@@ -180,10 +180,10 @@ public class DiscoveryRepositoryIntegrationTest extends MockDataTest
     other.setName("Other Project");
     other = projectRepository.save(other);
 
-    Discovery a = repository.save(createDiscovery(null, project));
-    Discovery b = repository.save(createDiscovery(null, other));
+    Fact a = repository.save(createFact(null, project));
+    Fact b = repository.save(createFact(null, other));
 
-    List<Discovery> result = repository.findAllByProjectId(project.getId());
+    List<Fact> result = repository.findAllByProjectId(project.getId());
 
     assertEquals(1, result.size());
     assertEquals(a.getId(), result.get(0).getId());

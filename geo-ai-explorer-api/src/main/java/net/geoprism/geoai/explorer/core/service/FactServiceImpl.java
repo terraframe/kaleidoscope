@@ -5,35 +5,35 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
-import net.geoprism.geoai.explorer.core.entity.Discovery;
-import net.geoprism.geoai.explorer.core.repository.DiscoveryRepository;
+import net.geoprism.geoai.explorer.core.entity.Fact;
+import net.geoprism.geoai.explorer.core.repository.FactRepository;
 
 @Service
-public class DiscoveryServiceImpl extends CrudServiceImpl<Discovery, Long> implements DiscoveryService
+public class FactServiceImpl extends CrudServiceImpl<Fact, Long> implements FactService
 {
-  private final DiscoveryRepository repository;
+  private final FactRepository repository;
 
-  public DiscoveryServiceImpl(DiscoveryRepository repository)
+  public FactServiceImpl(FactRepository repository)
   {
     this.repository = repository;
   }
 
   @Override
-  protected DiscoveryRepository repository()
+  protected FactRepository repository()
   {
     return repository;
   }
 
   @Override
-  public List<Discovery> fetchListByProject(Long projectId)
+  public List<Fact> fetchListByProject(Long projectId)
   {
     return repository.findAllByProjectId(projectId);
   }
 
   @Override
-  public Discovery update(Discovery snippet, Long id)
+  public Fact update(Fact snippet, Long id)
   {
-    Discovery entity = repository.findById(id).get();
+    Fact entity = repository.findById(id).get();
 
     if (StringUtils.isNotBlank(snippet.getName()))
     {

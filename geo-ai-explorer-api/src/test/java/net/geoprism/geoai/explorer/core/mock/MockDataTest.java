@@ -1,7 +1,7 @@
 package net.geoprism.geoai.explorer.core.mock;
 
 import net.geoprism.geoai.explorer.core.entity.Project;
-import net.geoprism.geoai.explorer.core.entity.Discovery;
+import net.geoprism.geoai.explorer.core.entity.Fact;
 
 public abstract class MockDataTest
 {
@@ -18,14 +18,14 @@ public abstract class MockDataTest
         .build();
   }
 
-  protected Discovery createDiscovery(Long id)
+  protected Fact createFact(Long id)
   {
-    return createDiscovery(id, createProject(1L));
+    return createFact(id, createProject(1L));
   }
 
-  protected Discovery createDiscovery(Long id, Project project)
+  protected Fact createFact(Long id, Project project)
   {
-    return Discovery.builder() //
+    return Fact.builder() //
         .id(id) //
         .name("Original Name") //
         .description("Original Description") //

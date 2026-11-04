@@ -18,8 +18,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "discovery")
-public class Discovery
+@Table(name = "fact")
+public class Fact
 {
 
   @Id

@@ -22,7 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import net.geoprism.geoai.explorer.core.config.TestConfiguration;
-import net.geoprism.geoai.explorer.core.entity.Discovery;
+import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.entity.Project;
 import net.geoprism.geoai.explorer.core.mock.MockDataTest;
 import net.geoprism.geoai.explorer.core.model.NameResolutionResult;
@@ -54,7 +54,7 @@ public class ToolServiceTest extends MockDataTest
   private ProjectService     projectService;
 
   @MockitoBean
-  private DiscoveryService   snippetService;
+  private FactService   snippetService;
 
   private HarnessInlineFunctionConfig getInlineFunction(HarnessTool tool)
   {
@@ -223,24 +223,24 @@ public class ToolServiceTest extends MockDataTest
   @Test
   public void testGetListSnippetsToolDefinition_NameAndType()
   {
-    HarnessTool tool = service.getListDiscoveryToolDefinition();
+    HarnessTool tool = service.getListFactsToolDefinition();
 
-    assertEquals(ToolService.LIST_DISCOVERIES_TOOL, tool.name());
+    assertEquals(ToolService.LIST_FACTS_TOOL, tool.name());
     assertEquals(HarnessToolType.INLINE_FUNCTION, tool.type());
   }
 
   @Test
   public void testGetListSnippetsToolDefinition_Description()
   {
-    HarnessInlineFunctionConfig function = getInlineFunction(service.getListDiscoveryToolDefinition());
+    HarnessInlineFunctionConfig function = getInlineFunction(service.getListFactsToolDefinition());
 
-    assertEquals("Returns a list of approved report snippets for the a project", function.description());
+    assertEquals("Returns a list of approved report facts for the a project", function.description());
   }
 
   @Test
   public void testGetListSnippetsToolDefinition_InputSchema()
   {
-    Document schema = getInlineFunction(service.getListDiscoveryToolDefinition()).inputSchema();
+    Document schema = getInlineFunction(service.getListFactsToolDefinition()).inputSchema();
 
     assertNotNull(schema);
     assertTrue(schema.isMap());
@@ -274,7 +274,7 @@ public class ToolServiceTest extends MockDataTest
         service.getQueryToolDefinition().name(), //
         service.getNameResolutionToolDefinition().name(), //
         service.getListProjectsToolDefinition().name(), //
-        service.getListDiscoveryToolDefinition().name() //
+        service.getListFactsToolDefinition().name() //
     );
 
     assertEquals(names.size(), names.stream().distinct().count(), "Tool names must be unique: " + names);
@@ -392,11 +392,11 @@ public class ToolServiceTest extends MockDataTest
   {
     Project project = createProject(5L, "Project A");
 
-    Discovery first = createDiscovery(10L, project);
+    Fact first = createFact(10L, project);
     first.setName("Snippet 1");
     first.setDescription("First snippet");
 
-    Discovery second = createDiscovery(11L, project);
+    Fact second = createFact(11L, project);
     second.setName("Snippet 2");
     second.setDescription("Second snippet");
 
@@ -405,9 +405,9 @@ public class ToolServiceTest extends MockDataTest
     ObjectNode args = JsonMapper.shared().createObjectNode();
     args.put(ToolService.PROJECT_PARAM, 5L);
 
-    ToolResponse response = service.execute(ToolService.LIST_DISCOVERIES_TOOL, args);
+    ToolResponse response = service.execute(ToolService.LIST_FACTS_TOOL, args);
 
-    assertEquals(ToolService.LIST_DISCOVERIES_TOOL, response.getName());
+    assertEquals(ToolService.LIST_FACTS_TOOL, response.getName());
     assertNull(response.getStatement());
 
     // The text is a JSON array of id/name/description summaries
