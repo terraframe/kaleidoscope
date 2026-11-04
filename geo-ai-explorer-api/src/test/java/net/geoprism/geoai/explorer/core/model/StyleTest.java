@@ -9,10 +9,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import net.geoprism.geoai.explorer.core.config.TestConfiguration;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-
-import net.geoprism.geoai.explorer.core.config.TestConfiguration;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK, classes = TestConfiguration.class)

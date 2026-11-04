@@ -176,7 +176,7 @@ public class BedrockService
         chatPromptService.getPrompt(), //
         inputText, //
         model, //
-        toolService.getDefinitions());
+        toolService.getPromptDefinitions());
 
     PromptResponse response = JsonMapper.shared().readerFor(PromptResponse.class).readValue(result.text);
 
@@ -204,7 +204,7 @@ public class BedrockService
     message.setAmbiguous(response.getAmbiguous());
     message.setStatements(result.toolResponses()
         .stream() //
-        .filter(t -> t.getName().equals(ToolService.SPARQL_TOOL))
+        .filter(t -> t.getName().equals(ToolService.QUERY_TOOL))
         .map(t -> t.getStatement())
         .filter(s -> StringUtils.isNotBlank(s))
         .toList());
@@ -228,7 +228,7 @@ public class BedrockService
         new LinkedList<>()).text();
 
     /*
-     * Retaining the workaround from the old implementation.
+     * Retaining the workaround from the old implementation.-
      */
     response = response.replace("<REDACTED>", "sparql");
 
