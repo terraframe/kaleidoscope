@@ -18,7 +18,13 @@ import {
   faMapLocation,
   faFloppyDisk,
   faTrash,
-  faBrain
+  faBrain,
+  faMagnifyingGlassChart,
+  faFileLines,
+  faLightbulb,
+  faChevronDown,
+  faChevronRight,
+  faNoteSticky
 } from '@fortawesome/free-solid-svg-icons';
 
 import { ChatService } from '../service/chat-service.service';
@@ -34,6 +40,8 @@ import {
 import { ExplorerService } from '../service/explorer.service';
 import { GeoObject } from '../models/geoobject.model';
 import { CachedExplorerPages, ExplorerSessionStateService } from '../service/explorer-session-state.service';
+import { ReportService } from '../service/report.service';
+import { ChatType, Fact, Project, ReportSection, ReportSelection, ReportTemplate } from '../models/report.model';
 
 import { marked } from 'marked';
 
@@ -48,6 +56,17 @@ interface ChatConversation {
   draft: string;
   loading: boolean;
   createdAt: number;
+  type: ChatType;
+  /** Only set when type is 'report'. */
+  report?: ReportSelection;
+}
+
+type SidebarTab = 'chat' | 'queries' | 'facts';
+
+interface FactGroup {
+  projectId: number;
+  projectName: string;
+  facts: Fact[];
 }
 
 interface RenderedChatMessage extends ChatMessage {
@@ -90,6 +109,12 @@ export class AichatComponent {
   public messageUserIcon = faUser;
   public messageSenderIcon = faUpRightAndDownLeftFromCenter;
   public reasoningIcon = faBrain;
+  public explorationChatIcon = faMagnifyingGlassChart;
+  public reportChatIcon = faFileLines;
+  public factIcon = faLightbulb;
+  public expandIcon = faChevronDown;
+  public sectionCollapsedIcon = faChevronRight;
+  public sectionNotesIcon = faNoteSticky;
 
   private store = inject(Store);
 
@@ -108,7 +133,17 @@ export class AichatComponent {
 
   public editingConversationId: string | null = null;
   public editingConversationTitle = '';
-  public activeSidebarTab: 'chat' | 'queries' = 'chat';
+  public activeSidebarTab: SidebarTab = 'chat';
+  public choosingChatType = false;
+
+  public templates: ReportTemplate[] = [];
+  public projects: Project[] = [];
+  public facts: Fact[] = [];
+  public factGroups: FactGroup[] = [];
+  public expandedFactId: number | null = null;
+  /** Names of the expanded sections in the report's Facts by section step. */
+  public expandedSections = new Set<string>();
+  private onFactsChange: Subscription;
   public highlightSavedQueryId: string | null = null;
   public highlightChatMessageId: string | null = null;
   public editingSavedQueryId: string | null = null;
@@ -141,8 +176,16 @@ export class AichatComponent {
     private errorService: ErrorService,
     private messageService: MessageService,
     private confirmationService: ConfirmationService,
-    private explorerSessionState: ExplorerSessionStateService
+    private explorerSessionState: ExplorerSessionStateService,
+    private reportService: ReportService
   ) {
+    this.templates = this.reportService.getTemplates();
+    this.projects = this.reportService.getProjects();
+    this.onFactsChange = this.reportService.facts$.subscribe(facts => {
+      this.facts = facts;
+      this.factGroups = this.groupFactsByProject(facts);
+    });
+
     this.savedQueries$ = this.explorerSessionState.savedQueries$;
     this.activeSidebarTab = this.loadActiveSidebarTab();
     this.onSavedQueriesChange = this.savedQueries$.subscribe(savedQueries => {
@@ -179,6 +222,7 @@ export class AichatComponent {
   ngOnDestroy(): void {
     this.onWorkflowStepChange.unsubscribe();
     this.onSavedQueriesChange.unsubscribe();
+    this.onFactsChange.unsubscribe();
   }
 
   @HostListener('window:hashchange')
@@ -299,11 +343,13 @@ export class AichatComponent {
         messages: Array.isArray(c.messages) ? c.messages.map(message => parseText(message)) : [],
         draft: c.draft ?? '',
         loading: false,
-        createdAt: c.createdAt ?? Date.now()
+        createdAt: c.createdAt ?? Date.now(),
+        type: c.type === 'report' ? 'report' : 'exploration',
+        report: c.type === 'report' ? this.normalizeReportSelection(c.report) : undefined
       }));
 
       const hasRealChatHistory = this.conversations.some(c =>
-        c.messages.some(m => m.purpose === 'standard') || c.draft.trim().length > 0
+        c.messages.some(m => m.purpose === 'standard') || c.draft.trim().length > 0 || c.type === 'report'
       );
 
       if (!hasRealChatHistory) {
@@ -388,22 +434,32 @@ export class AichatComponent {
     };
   }
 
-  newConversation(save = true): void {
+  /** Opens or closes the chooser for what kind of chat to create. */
+  toggleChatTypeChooser(): void {
+    this.choosingChatType = !this.choosingChatType;
+  }
+
+  newConversation(save = true, type: ChatType = 'exploration'): void {
     const id = uuidv4();
 
     const conversation: ChatConversation = {
       id,
-      title: 'New chat',
+      title: type === 'report' ? 'New report' : 'New chat',
       sessionId: uuidv4(),
       messages: [],
       draft: '',
       loading: false,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      type,
+      report: type === 'report' ? this.normalizeReportSelection(undefined) : undefined
     };
 
     this.conversations.unshift(conversation);
     this.activeConversationId = id;
+    this.activeSidebarTab = 'chat';
+    this.choosingChatType = false;
     this.refreshRenderedMessages();
+    this.saveActiveSidebarTab();
 
     if (save) {
       this.saveConversations();
@@ -420,7 +476,8 @@ export class AichatComponent {
       messages: this.createDefaultMessages(),
       draft: '',
       loading: false,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      type: 'exploration'
     };
 
     this.conversations.unshift(conversation);
@@ -434,21 +491,22 @@ export class AichatComponent {
 
   selectConversation(id: string): void {
     this.activeConversationId = id;
+    this.expandedSections.clear();
     this.activeSidebarTab = 'chat';
     this.refreshRenderedMessages();
     this.saveActiveSidebarTab();
     this.saveConversations();
   }
 
-  setActiveSidebarTab(tab: 'chat' | 'queries'): void {
+  setActiveSidebarTab(tab: SidebarTab): void {
     this.activeSidebarTab = tab;
     this.saveActiveSidebarTab();
   }
 
-  private loadActiveSidebarTab(): 'chat' | 'queries' {
-    return localStorage.getItem(this.ACTIVE_SIDEBAR_TAB_STORAGE_KEY) === 'queries'
-      ? 'queries'
-      : 'chat';
+  private loadActiveSidebarTab(): SidebarTab {
+    const stored = localStorage.getItem(this.ACTIVE_SIDEBAR_TAB_STORAGE_KEY);
+
+    return stored === 'queries' || stored === 'facts' ? stored : 'chat';
   }
 
   private saveActiveSidebarTab(): void {
@@ -519,7 +577,7 @@ export class AichatComponent {
 
     conversation.title = trimmed.length > 0
       ? trimmed
-      : 'New chat';
+      : this.defaultTitle(conversation);
 
     this.editingConversationId = null;
     this.editingConversationTitle = '';
@@ -540,8 +598,12 @@ export class AichatComponent {
     return [];
   }
 
+  private defaultTitle(conversation: ChatConversation): string {
+    return conversation.type === 'report' ? 'New report' : 'New chat';
+  }
+
   private updateConversationTitle(conversation: ChatConversation, text: string): void {
-    if (conversation.title !== 'New chat') {
+    if (conversation.title !== this.defaultTitle(conversation)) {
       return;
     }
 
@@ -552,18 +614,23 @@ export class AichatComponent {
       : trimmed;
   }
 
-  sendMessage(): void {
+  /**
+   * Sends the active conversation's draft, or `text` when given (which
+   * leaves the draft alone).
+   */
+  sendMessage(text?: string): void {
     const conversation = this.activeConversation;
+    const fromDraft = text == null;
 
-    if (!conversation || conversation.loading || !conversation.draft.trim()) {
+    text = (text ?? conversation?.draft ?? '').trim();
+
+    if (!conversation || conversation.loading || !text) {
       return;
     }
 
     if (this.minimized) {
       this.minimizeChat();
     }
-
-    const text = conversation.draft.trim();
 
     const message: ChatMessage = {
       id: uuidv4(),
@@ -574,9 +641,12 @@ export class AichatComponent {
       purpose: 'standard'
     };
 
-    conversation.draft = '';
+    if (fromDraft) {
+      conversation.draft = '';
+      this.resetMessageInputHeight();
+    }
+
     conversation.messages.push(message);
-    this.resetMessageInputHeight();
     this.updateConversationTitle(conversation, text);
 
     const system: ChatMessage = {
@@ -598,14 +668,18 @@ export class AichatComponent {
     const systemMessageId = system.id;
     const sessionId = conversation.sessionId;
 
-    this.chatService.sendMessage(sessionId, message, statusUrl => {
-      // Persist the job's status URL onto the placeholder message so that
-      // if the page is closed or reloaded before the job settles,
-      // reconcilePendingJobs() can resume polling it (or fail it cleanly)
-      // on the next boot instead of leaving a permanent busy spinner.
-      system.pendingStatusUrl = statusUrl;
-      this.saveConversations();
-    })
+    const request = conversation.type === 'report'
+      ? this.reportService.sendMessage(sessionId, message, conversation.report ?? this.normalizeReportSelection(undefined))
+      : this.chatService.sendMessage(sessionId, message, statusUrl => {
+        // Persist the job's status URL onto the placeholder message so that
+        // if the page is closed or reloaded before the job settles,
+        // reconcilePendingJobs() can resume polling it (or fail it cleanly)
+        // on the next boot instead of leaving a permanent busy spinner.
+        system.pendingStatusUrl = statusUrl;
+        this.saveConversations();
+      });
+
+    request
       .then(response => {
         const targetConversation = this.conversations.find(c => c.id === conversationId);
 
@@ -1109,7 +1183,7 @@ export class AichatComponent {
       conversation.messages = [];
       conversation.sessionId = uuidv4();
       conversation.draft = '';
-      conversation.title = 'New chat';
+      conversation.title = this.defaultTitle(conversation);
       conversation.loading = false;
     }
 
@@ -1132,6 +1206,7 @@ export class AichatComponent {
   resizeMessageInput(textarea: HTMLTextAreaElement): void {
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > 180 ? 'auto' : 'hidden';
   }
 
   private resetMessageInputHeight(): void {
@@ -1157,5 +1232,320 @@ export class AichatComponent {
       .finally(() => {
         this.mapLoading = false;
       });
+  }
+
+  /*
+   * Report generation chats
+   */
+
+  get isReportChat(): boolean {
+    return this.activeConversation?.type === 'report';
+  }
+
+  get activeReport(): ReportSelection | undefined {
+    return this.activeConversation?.report;
+  }
+
+  get selectedTemplate(): ReportTemplate | undefined {
+    return this.reportService.getTemplate(this.activeReport?.templateId);
+  }
+
+  get selectedProject(): Project | undefined {
+    return this.reportService.getProject(this.activeReport?.projectId);
+  }
+
+  /** Facts that can be picked for the active report: those in its project. */
+  get availableReportFacts(): Fact[] {
+    const projectId = this.activeReport?.projectId;
+
+    return projectId == null ? [] : this.facts.filter(f => f.projectId === projectId);
+  }
+
+  get selectedFacts(): Fact[] {
+    const ids = this.activeReport?.factIds ?? [];
+
+    return this.facts.filter(f => ids.includes(f.id));
+  }
+
+  get messagePlaceholder(): string {
+    if (!this.isReportChat) {
+      return 'Type a message...';
+    }
+
+    return this.isReportSetupIncomplete(this.activeConversation)
+      ? 'Describe your report...'
+      : 'Ask the report assistant...';
+  }
+
+  private normalizeReportSelection(selection: Partial<ReportSelection> | undefined): ReportSelection {
+    return {
+      templateId: selection?.templateId ?? null,
+      projectId: selection?.projectId ?? null,
+      factIds: Array.isArray(selection?.factIds) ? [...selection!.factIds] : [],
+      sectionFacts: { ...(selection?.sectionFacts ?? {}) },
+      sectionNotes: { ...(selection?.sectionNotes ?? {}) }
+    };
+  }
+
+  private isReportSetupIncomplete(conversation: ChatConversation | undefined): boolean {
+    if (conversation?.type !== 'report') {
+      return false;
+    }
+
+    const report = conversation.report;
+
+    return !report?.templateId || report.projectId == null || conversation.messages.length === 0;
+  }
+
+  selectTemplate(templateId: string): void {
+    const report = this.activeReport;
+
+    if (!report) {
+      return;
+    }
+
+    report.templateId = report.templateId === templateId ? null : templateId;
+
+    // Keep assignments to sections the new template shares by name. Facts in
+    // the other sections stay in the report, unassigned.
+    const sectionNames = new Set(this.selectedTemplate?.sections.map(s => s.name) ?? []);
+    report.sectionFacts = Object.fromEntries(
+      Object.entries(report.sectionFacts).filter(([name]) => sectionNames.has(name))
+    );
+    // Notes are the user's own writing, so keep them even for sections the
+    // new template doesn't have; switching back brings them back.
+    this.expandedSections.clear();
+
+    this.saveConversations();
+  }
+
+  selectProject(projectId: number | null): void {
+    const report = this.activeReport;
+
+    if (!report || report.projectId === projectId) {
+      return;
+    }
+
+    report.projectId = projectId;
+    // Facts belong to a project, so a different project clears the picks.
+    report.factIds = [];
+    report.sectionFacts = {};
+    this.saveConversations();
+  }
+
+  /** Removes a fact from the report and from every section it was in. */
+  removeFactFromReport(fact: Fact): void {
+    const report = this.activeReport;
+
+    if (!report) {
+      return;
+    }
+
+    this.removeFactFromSelection(report, fact.id);
+    this.saveConversations();
+  }
+
+  private removeFactFromSelection(report: ReportSelection, factId: number): void {
+    report.factIds = report.factIds.filter(id => id !== factId);
+
+    for (const name of Object.keys(report.sectionFacts)) {
+      report.sectionFacts[name] = report.sectionFacts[name].filter(id => id !== factId);
+    }
+  }
+
+  factsInSection(section: ReportSection): Fact[] {
+    const ids = this.activeReport?.sectionFacts[section.name] ?? [];
+
+    return ids.map(id => this.facts.find(f => f.id === id)).filter((f): f is Fact => f != null);
+  }
+
+  /** Project facts that can still be added to a section. */
+  factsAssignableToSection(section: ReportSection): Fact[] {
+    const ids = this.activeReport?.sectionFacts[section.name] ?? [];
+
+    return this.availableReportFacts.filter(f => !ids.includes(f.id));
+  }
+
+  /** Facts in the report that aren't assigned to any section of the template. */
+  get unassignedFacts(): Fact[] {
+    const report = this.activeReport;
+    const template = this.selectedTemplate;
+
+    if (!report) {
+      return [];
+    }
+
+    const assigned = new Set(
+      (template?.sections ?? []).flatMap(s => report.sectionFacts[s.name] ?? [])
+    );
+
+    return this.selectedFacts.filter(f => !assigned.has(f.id));
+  }
+
+  get requiredSectionCoverage(): { covered: number; total: number } {
+    const required = this.selectedTemplate?.sections.filter(s => s.required) ?? [];
+
+    return {
+      covered: required.filter(s => this.sectionHasContent(s)).length,
+      total: required.length
+    };
+  }
+
+  /** A section has content once it has a fact or some notes. */
+  sectionHasContent(section: ReportSection): boolean {
+    const report = this.activeReport;
+
+    return (report?.sectionFacts[section.name]?.length ?? 0) > 0
+      || (report?.sectionNotes[section.name]?.trim().length ?? 0) > 0;
+  }
+
+  isSectionExpanded(section: ReportSection): boolean {
+    return this.expandedSections.has(section.name);
+  }
+
+  toggleSection(section: ReportSection): void {
+    if (this.expandedSections.has(section.name)) {
+      this.expandedSections.delete(section.name);
+    } else {
+      this.expandedSections.add(section.name);
+    }
+  }
+
+  sectionNotes(section: ReportSection): string {
+    return this.activeReport?.sectionNotes[section.name] ?? '';
+  }
+
+  setSectionNotes(section: ReportSection, notes: string): void {
+    const report = this.activeReport;
+
+    if (!report) {
+      return;
+    }
+
+    if (notes.length > 0) {
+      report.sectionNotes[section.name] = notes;
+    } else {
+      delete report.sectionNotes[section.name];
+    }
+
+    this.saveConversations();
+  }
+
+  /** Generate needs a template and a project; the rest is up to the user. */
+  get canGenerateReport(): boolean {
+    const report = this.activeReport;
+
+    return !!report?.templateId && report.projectId != null && !this.loading;
+  }
+
+  /** Asks the report agent to write the report from the current setup. */
+  generateReport(): void {
+    if (!this.canGenerateReport) {
+      return;
+    }
+
+    this.sendMessage('Generate the report from the selected template, facts and section notes.');
+  }
+
+  sectionExampleHtml(section: ReportSection): string {
+    return this.renderMarkdown(section.example);
+  }
+
+  assignFactToSection(section: ReportSection, factId: number): void {
+    const report = this.activeReport;
+
+    if (!report || !Number.isFinite(factId)) {
+      return;
+    }
+
+    const ids = report.sectionFacts[section.name] ?? [];
+
+    if (!ids.includes(factId)) {
+      report.sectionFacts[section.name] = [...ids, factId];
+    }
+
+    if (!report.factIds.includes(factId)) {
+      report.factIds = [...report.factIds, factId];
+    }
+
+    this.saveConversations();
+  }
+
+  /** Handles the "Add fact" dropdown on a section, then resets it. */
+  onAssignFactSelect(event: Event, section: ReportSection): void {
+    const select = event.target as HTMLSelectElement;
+
+    this.assignFactToSection(section, Number(select.value));
+    select.value = '';
+  }
+
+  /**
+   * Takes a fact out of one section. A fact that ends up in no section leaves
+   * the report, so the report's facts are always the ones placed somewhere
+   * (apart from those added from the Facts tab that haven't been placed yet).
+   */
+  unassignFactFromSection(section: ReportSection, fact: Fact): void {
+    const report = this.activeReport;
+
+    if (!report) {
+      return;
+    }
+
+    report.sectionFacts[section.name] = (report.sectionFacts[section.name] ?? []).filter(id => id !== fact.id);
+
+    const stillAssigned = Object.values(report.sectionFacts).some(ids => ids.includes(fact.id));
+
+    if (!stillAssigned) {
+      report.factIds = report.factIds.filter(id => id !== fact.id);
+    }
+
+    this.saveConversations();
+  }
+
+  toggleFactDetails(fact: Fact): void {
+    this.expandedFactId = this.expandedFactId === fact.id ? null : fact.id;
+  }
+
+  deleteFact(event: Event, fact: Fact): void {
+    event.stopPropagation();
+
+    this.confirmationService.confirm({
+      target: event.currentTarget as EventTarget,
+      header: 'Delete fact?',
+      message: `Delete "${fact.name}"? Reports will no longer be able to use it.`,
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'Delete',
+      rejectLabel: 'Cancel',
+      acceptButtonStyleClass: 'p-button-danger',
+      rejectButtonStyleClass: 'p-button-secondary p-button-text',
+      accept: () => {
+        this.reportService.deleteFact(fact.id);
+
+        for (const conversation of this.conversations) {
+          if (conversation.report) {
+            this.removeFactFromSelection(conversation.report, fact.id);
+          }
+        }
+
+        this.saveConversations();
+      }
+    });
+  }
+
+  private groupFactsByProject(facts: Fact[]): FactGroup[] {
+    const groups = new Map<number, FactGroup>();
+
+    for (const fact of facts) {
+      let group = groups.get(fact.projectId);
+
+      if (!group) {
+        group = { projectId: fact.projectId, projectName: fact.projectName, facts: [] };
+        groups.set(fact.projectId, group);
+      }
+
+      group.facts.push(fact);
+    }
+
+    return [...groups.values()];
   }
 }

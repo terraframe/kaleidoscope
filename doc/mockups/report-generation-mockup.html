@@ -1,0 +1,1743 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaleidoscope Report Chat</title>
+<!--
+  Standalone mockup of the Kaleidoscope chat workflows: data exploration
+  chats, report generation chats (template, project, facts by section,
+  section notes, generate) and the Facts tab.
+
+  Everything is hardcoded. There is no AI, no server and no map; replies are
+  canned and nothing is saved when the page is reloaded.
+
+  The report templates are copied from
+  geo-ai-explorer-api/src/main/resources/report-templates/*.json.
+-->
+<style>
+:root {
+  --surface-ground: #f6f7f9;
+  --surface-card: #ffffff;
+  --surface-section: #f8fafc;
+  --surface-muted: #eef2f6;
+  --surface-hover: #f0f2f5;
+  --surface-border: #d9dee7;
+  --text-color: #172033;
+  --text-color-secondary: #64748b;
+  --primary-color: #10b981;
+  --primary-contrast: #ffffff;
+  --primary-soft: #e0f2f1;
+  --code-background: rgba(15, 23, 42, 0.08);
+  --warning: #b45309;
+  --warning-edge: #f59e0b;
+  --fact-icon: #d97706;
+  --shadow-floating: 0 8px 24px rgba(15, 23, 42, 0.18);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-ground: #0b1120;
+    --surface-card: #111827;
+    --surface-section: #172033;
+    --surface-muted: #1e293b;
+    --surface-hover: #253248;
+    --surface-border: #334155;
+    --text-color: #e5edf7;
+    --text-color-secondary: #a8b5c7;
+    --primary-color: #34d399;
+    --primary-contrast: #052e24;
+    --primary-soft: #123c38;
+    --code-background: rgba(148, 163, 184, 0.16);
+    --warning: #fbbf24;
+    --warning-edge: #d97706;
+    --fact-icon: #fbbf24;
+    --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.45);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface-ground: #0b1120;
+  --surface-card: #111827;
+  --surface-section: #172033;
+  --surface-muted: #1e293b;
+  --surface-hover: #253248;
+  --surface-border: #334155;
+  --text-color: #e5edf7;
+  --text-color-secondary: #a8b5c7;
+  --primary-color: #34d399;
+  --primary-contrast: #052e24;
+  --primary-soft: #123c38;
+  --code-background: rgba(148, 163, 184, 0.16);
+  --warning: #fbbf24;
+  --warning-edge: #d97706;
+  --fact-icon: #fbbf24;
+  --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--surface-ground);
+  color: var(--text-color);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.125em;
+}
+
+/* ---------- Shell ---------- */
+
+.demo-badge {
+  display: block;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  border: 1px dashed var(--warning-edge);
+  border-radius: 6px;
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.top-actions {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 40;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.top-action {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface-card);
+  box-shadow: var(--shadow-floating);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.top-action:hover { color: var(--primary-color); border-color: var(--primary-color); }
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  border: 2px solid var(--surface-border);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+
+/* ---------- Sidebar ---------- */
+
+.sidebar {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-right: 1px solid var(--surface-border);
+  background: var(--surface-section);
+  overflow: hidden;
+}
+
+.sidebar-tabs {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.sidebar-tab {
+  min-width: 0;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-color-secondary);
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.sidebar-tab.active {
+  background: var(--surface-card);
+  color: var(--text-color);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.conv {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: var(--surface-card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.conv:hover { background: var(--surface-hover); }
+.conv.active { background: var(--primary-soft); border-color: var(--primary-color); }
+
+.conv-type { color: var(--text-color-secondary); font-size: 0.85rem; }
+.conv-type.report { color: var(--primary-color); }
+
+.conv-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+.conv-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  background: var(--surface-card);
+}
+
+.conv-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.8rem;
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+.conv-btn:hover { opacity: 1; background: var(--code-background); }
+
+.chooser { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
+
+.chooser-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: var(--surface-card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chooser-option:hover, .chooser-option:focus-visible {
+  border-color: var(--primary-color);
+  background: var(--primary-soft);
+}
+
+.chooser-option .icon { margin-top: 2px; color: var(--text-color-secondary); }
+.chooser-option .icon.report { color: var(--primary-color); }
+.chooser-name { display: block; font-size: 0.9rem; font-weight: 650; }
+.chooser-desc { display: block; color: var(--text-color-secondary); font-size: 0.78rem; line-height: 1.3; }
+
+.new-chat {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.new-chat:hover { background: var(--surface-hover); }
+.new-chat.cancel { background: var(--text-color); color: var(--surface-card); border-color: var(--text-color); }
+
+.card {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: var(--surface-card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.card:hover { background: var(--surface-hover); }
+
+.card-title { display: flex; gap: 6px; align-items: baseline; font-weight: 650; line-height: 1.2; font-size: 0.9rem; }
+.card-meta { color: var(--text-color-secondary); font-size: 0.78rem; line-height: 1.3; }
+.fact-icon { color: var(--fact-icon); font-size: 0.85rem; }
+
+.card-actions { display: flex; justify-content: flex-end; gap: 4px; width: 100%; padding-top: 2px; }
+
+.card-action {
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+}
+
+.card-action:hover { background: var(--code-background); }
+
+.fact-details { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 4px; }
+.fact-text { margin: 0; font-size: 0.82rem; line-height: 1.4; }
+
+.fact-statements {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--code-background);
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.group-heading {
+  flex: 0 0 auto;
+  margin: 6px 2px 0;
+  color: var(--text-color-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.group-heading:first-child { margin-top: 0; }
+
+.empty { margin: 8px 4px; color: var(--text-color-secondary); font-size: 0.85rem; text-align: center; }
+
+.sidebar-note {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.65rem 0.25rem 0;
+  border-top: 1px solid var(--surface-border);
+  color: var(--text-color-secondary);
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+
+/* ---------- Main ---------- */
+
+.main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main.report-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 36%, 500px);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.chat-column {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.report-layout .chat-column { border-left: 1px solid var(--surface-border); }
+
+.pane-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 3.75rem;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.pane-header h2 { margin: 0 6px 0 0; font-size: 0.95rem; }
+.chat-column .pane-header { padding-right: calc(3.5rem + 14px); }
+.pane-header .icon { color: var(--primary-color); }
+
+.chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border: 1px solid var(--primary-color);
+  border-radius: 999px;
+  background: var(--primary-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.chip.empty {
+  border-style: dashed;
+  border-color: var(--surface-border);
+  background: transparent;
+  color: var(--text-color-secondary);
+  font-weight: 500;
+}
+
+/* ---------- Messages ---------- */
+
+.messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  padding: 10px 10px 4px;
+}
+
+.message {
+  width: min(100%, 900px);
+  align-self: center;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.message.user { flex-direction: row-reverse; }
+
+.avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--text-color-secondary);
+  font-size: 1.3rem;
+}
+
+.avatar svg.logo { width: 1.9rem; height: auto; }
+
+.bubble {
+  min-width: 0;
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+
+.message.user .bubble { background: var(--primary-soft); }
+.message.system .bubble { border: 1px solid var(--surface-border); background: var(--surface-section); }
+
+.empty-chat {
+  margin: auto;
+  max-width: 34rem;
+  padding: 24px;
+  color: var(--text-color-secondary);
+  text-align: center;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.empty-chat strong { display: block; margin-bottom: 4px; color: var(--text-color); font-size: 1rem; }
+
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 0 0 0.6em; }
+.md h1, .md h2, .md h3 { margin: 0.8em 0 0.35em; line-height: 1.25; }
+.md h1 { font-size: 1.15rem; }
+.md h2 { font-size: 1.02rem; }
+.md h3 { font-size: 0.95rem; }
+.md ul, .md ol { margin: 0 0 0.6em; padding-left: 1.3em; }
+.md blockquote { margin: 0 0 0.6em; padding: 2px 10px; border-left: 3px solid var(--warning-edge); color: var(--text-color-secondary); }
+.md code { padding: 1px 4px; border-radius: 4px; background: var(--code-background); font-size: 0.88em; }
+.md table { margin: 0 0 0.6em; border-collapse: collapse; font-size: 0.86em; }
+.md th, .md td { padding: 3px 6px; border: 1px solid var(--surface-border); text-align: left; vertical-align: top; }
+.md th { background: var(--surface-muted); }
+.md a { color: var(--primary-color); }
+.md hr { margin: 0.8em 0; border: 0; border-top: 1px solid var(--surface-border); }
+
+.dots { display: inline-flex; gap: 4px; padding: 4px 0; }
+.dots span { width: 7px; height: 7px; border-radius: 50%; background: #9880ff; animation: dot 1s infinite ease-in-out; }
+.dots span:nth-child(2) { animation-delay: 0.15s; }
+.dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+.input-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 6px 10px 10px;
+  padding: 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  background: var(--surface-card);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.input-row:focus-within { border-color: var(--primary-color); }
+
+.input-row textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 180px;
+  padding: 7px 4px;
+  border: 0;
+  background: transparent;
+  resize: none;
+  outline: none;
+  overflow-y: hidden;
+  line-height: 1.4;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--primary-color);
+  border-radius: 6px;
+  background: var(--primary-color);
+  color: var(--primary-contrast);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.secondary { border-color: var(--surface-border); background: var(--surface-muted); color: var(--text-color); padding: 8px 10px; }
+
+/* ---------- Report setup ---------- */
+
+.setup {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-section);
+}
+
+.setup-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* One step after another, top to bottom */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 14px 14px;
+}
+
+.step { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.step-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: var(--primary-color);
+  color: var(--primary-contrast);
+  font-size: 0.7rem;
+}
+
+.coverage { margin-left: auto; color: var(--warning); font-size: 0.75rem; font-weight: 600; }
+.coverage.complete { color: var(--primary-color); }
+
+.hint { margin: 0; color: var(--text-color-secondary); font-size: 0.8rem; }
+
+.template {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: var(--surface-card);
+  cursor: pointer;
+}
+
+.template:hover { background: var(--surface-hover); }
+.template.selected { border-color: var(--primary-color); background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary-color); }
+.template-name { font-weight: 650; font-size: 0.88rem; }
+.template-options {
+  /* Templates side by side, wrapping onto more rows as needed */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  align-items: start;
+  gap: 8px;
+}
+
+.template-regulation {
+  /* Citations can run several lines; the full text is in the tooltip */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--text-color-secondary);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+.template-regulation a { color: inherit; }
+
+.optional { color: var(--text-color-secondary); font-size: 0.7rem; font-style: italic; font-weight: 500; }
+
+.project-select {
+  width: 100%;
+  max-width: 28rem;
+  padding: 7px 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-card);
+  font-size: 0.85rem;
+}
+
+.sections { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+
+.section {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 4px 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-card);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.section:not(.expanded):hover { background: var(--surface-hover); }
+.section:hover .section-name { color: var(--primary-color); }
+.section.expanded { border-color: var(--primary-color); }
+.section.missing { border-left: 3px solid var(--warning-edge); }
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  margin: -6px 0 -6px -8px;
+  padding: 6px 4px 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.section-header:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+.section-chevron { width: 0.7rem; color: var(--text-color-secondary); font-size: 0.7rem; }
+.section-heading { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; }
+.has-notes { color: var(--text-color-secondary); font-size: 0.75rem; }
+.needs-content { color: var(--warning); font-size: 0.7rem; font-weight: 600; }
+
+.section-facts { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
+
+.fact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 1px 2px 1px 8px;
+  border: 1px solid var(--primary-color);
+  border-radius: 999px;
+  background: var(--primary-soft);
+  font-size: 0.76rem;
+}
+
+.fact-chip.unassigned { border-style: dashed; border-color: var(--warning-edge); background: transparent; }
+.fact-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.chip-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-color-secondary);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.chip-remove:hover { background: var(--code-background); color: var(--text-color); }
+
+.add-fact {
+  max-width: 11rem;
+  padding: 2px 6px;
+  border: 1px dashed var(--surface-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary-color);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-fact:hover, .add-fact:focus { border-color: var(--primary-color); outline: none; }
+.add-fact option { color: var(--text-color); background: var(--surface-card); }
+
+.section-details {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 10px 0 2px 1.1rem;
+  border-top: 1px solid var(--surface-border);
+  cursor: default;
+}
+
+.details-label {
+  margin: 0 0 3px;
+  color: var(--text-color-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.details-label .aside { margin-left: 4px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.section-summary { margin: 0; font-size: 0.82rem; line-height: 1.45; }
+.section-example summary { cursor: pointer; }
+
+.section-example-body {
+  max-height: 280px;
+  overflow: auto;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-section);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.section-notes { display: flex; flex-direction: column; }
+
+.section-notes textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: 6px 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-card);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.section-notes textarea:focus { border-color: var(--primary-color); outline: none; }
+
+.unassigned-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.unassigned-label { color: var(--warning); font-size: 0.75rem; font-weight: 600; }
+
+.generate {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--surface-border);
+}
+
+.generate-hint { color: var(--text-color-secondary); font-size: 0.8rem; }
+.generate-hint.warning { color: var(--warning); }
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 1000px) {
+  .main.report-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 45%) minmax(0, 1fr);
+  }
+
+  .report-layout .chat-column { border-left: 0; border-top: 1px solid var(--surface-border); }
+  .report-layout .chat-column .pane-header { display: none; }
+  .setup .pane-header { padding-right: calc(3.5rem + 14px); }
+}
+
+@media (max-width: 700px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .sidebar { max-height: 210px; border-right: 0; border-bottom: 1px solid var(--surface-border); }
+  .section { grid-template-columns: 1fr; }
+  .top-actions { top: auto; bottom: 4.5rem; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Chats, saved queries and facts"></aside>
+  <main class="main" id="main"></main>
+</div>
+
+<div class="top-actions">
+  <button type="button" class="top-action" data-action="toggle-theme" id="theme-toggle" aria-label="Toggle dark mode"></button>
+</div>
+
+
+<script>
+'use strict';
+
+/* ================= Data ================= */
+
+const TEMPLATES = [
+  {
+    "id": "PLAN_EVAL_234",
+    "name": "Plan Evaluation (33 CFR Part 234)",
+    "regulation": "33 CFR Part 234, Corps of Engineers Agency Specific Procedures to Implement the Principles, Requirements and Guidelines for Federal Investments in Water Resources (89 FR 104021, Dec. 19, 2024), principally §§ 234.7, 234.9 and 234.10",
+    "regulationUrl": "https://www.ecfr.gov/current/title-33/chapter-II/part-234",
+    "sections": [
+      {
+        "name": "Evaluation Framework",
+        "summary": "Introduce how the final array of alternatives was evaluated. State that each alternative in the final array, including the No Action alternative, was evaluated by comparing the with-project condition to the without-project (No Action) condition over the same period of analysis. Describe the categories of effects evaluated (economic, environmental and social benefits and costs) and how each was measured: monetized where practicable, otherwise quantified, otherwise described qualitatively in enough detail to differentiate alternatives. State the period of analysis and its justification, the price level, the discount rate and any other key assumptions that affect the comparison, and identify the main models, data sources and best available actionable science (including Indigenous Knowledge where relevant) used. State whether a standard or scaled level of analysis was applied. Introduce the evaluation procedures used in the subsections that follow: benefit-cost comparison, performance against study objectives, performance against the four formulation criteria (completeness, effectiveness, efficiency, acceptability) and contributions to the Guiding Principles. (33 CFR 234.5(a); 234.7(a); 234.7(b)(1)-(2); 234.7(c)(1)-(2); 234.7(l); 234.9(a); 234.9(b); 234.9(c))",
+        "example": "3.5 Plan Evaluation\nThe focused array of alternatives, as described above, was evaluated by projecting and comparing the with project and without project conditions. Plan formulation focused on addressing the identified problems and meeting study objectives, including those responsive to national, state, and local concerns. Consideration of state and local objectives in concert with national objectives necessitates the inclusion and assessment of a broad range of benefits and impacts, both qualitative and quantitative. Alternative plans were assessed to determine if they have net benefits in total and by type. The set of plans judged to be likely to have net benefits were candidates for further analysis and included in the final array. The four action-alternatives carried into the final array were evaluated on the Principles and Guidelines Criteria of:\n- Efficiency – The potential benefits/outcome of the measure are greater than what could be provided by another measure/plan of equal or greater cost.\n- Effectiveness – Extent to which a measure or alternative alleviates problem areas and meets planning objectives.\n- Acceptability – Viability and appropriateness of an alternative from the perspective of the general public and consistency with existing Federal laws, authorities, and public policies.\n- Completeness – Extent to which an alternative provides and accounts for all features, investments, and/or other actions necessary to realize the planned effects, including any necessary actions by others.\n\nAdditionally, plans were assessed on the Principles and Guidelines four accounts:\n- National Economic Development (NED) – the value of national output of goods and services\n- Regional Economic Development (RED) – changes in regional income and employment\n- Environmental Quality (EQ) – riparian habitat, aquatic habitat, cultural resources, and trucking air emissions from sediment disposal offsite\n- Other Social Effects (OSE) – life safety, environmental justice, and critical infrastructure resiliency\n\nComprehensive documentation of total benefits of project alternatives, including equal consideration of economic, environmental, and social categories has been undertaken in accordance with the Assistant Secretary for the Army for Civil Works (ASACW) Policy Directive on the \"Comprehensive Documentation of Benefits in Decision Document,\" dated 5 January 2021.",
+        "required": true
+      },
+      {
+        "name": "Benefit-Cost Analysis and Net Public Benefits",
+        "summary": "For each alternative in the final array, report the monetized benefits and costs and compare them. Present the present value of costs against the present value of public benefits, and the corresponding average annual costs, average annual benefits, net annual benefits and benefit-cost ratio. Explain what costs are included (first costs of construction, interest during construction, operation, maintenance, repair, replacement and rehabilitation, mitigation) and which benefit categories are monetized (for example, damages reduced, ecosystem services, recreation). Include monetized environmental and social benefits and costs, including ecosystem services, where they can be monetized. State the price level, discount rate, period of analysis and the economic modeling software used, and reference the appendix with full methods. Identify which alternative has the highest net benefits and whether any separable elements were evaluated independently. Do not include regional economic development effects in the net public benefits calculation. Provide a summary table with a footnote stating price level, period of analysis and discount rate. (33 CFR 234.4(c); 234.7(a); 234.7(b)(1)-(2); 234.8(a)(5); 234.9(b)(1); 234.9(c))",
+        "example": "3.5.1 National Economic Development (NED) Analysis\nThe final array alternatives were evaluated for their cost effectiveness, measured in terms of net benefits, calculated by subtracting the annual costs from the expected annual economic benefits (Table 21). The Combination Plan had the highest net annual benefits of the alternatives considered in the final array.\n\nNED analysis assesses how the alternatives in the final array may reasonably maximize expected net benefits. The net benefits are computed as the annualized flood damage reduction benefits gained minus the annualized cost of construction and Operations, Maintenance, Repair, Rehabilitation and Replacement (OMRR&R). Expected annual damages were estimated using the HEC-FDA computer program. Net benefit computations for the focused array were evaluated based on October 2023 price levels.\n\nTable 21. Economic net benefits and benefit cost ratio (BCR) of alternatives carried forward.\n\n| Alternative | Average Annual Costs | Average Annual Benefits | Net Annual Benefits | Benefit to Cost Ratio |\n|---|---|---|---|---|\n| 2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | $14.0M | $22.1M | $8.1M | 1.6 |\n| 3b – Modified Bypass Plan (previous authorized plan, partially constructed) | $21.2M | $21.9M | $0.7M | 1.0 |\n| 4 - Nonstructural Plan | $9.9M | $9.2M | $0.7M | 1.1 |\n| 7 – Low Scope Plan | $5.5M | $20.1M | $14.6M | 3.7 |\n| 8b – Combination Plan | $6.4M | $21.6M | $15.2M | 3.4 |\n\nFiscal Year (FY) 2023 price levels, 50-year period of analysis, 2.5% discount rate",
+        "required": true
+      },
+      {
+        "name": "Residual Risk and Uncertainty",
+        "summary": "For each alternative, report the risk that remains after implementation compared with the No Action alternative: without- and with-project expected annual damages (or other hazard consequences), damages reduced and percent reduced. Describe where and why residual risk remains and how it would be managed and communicated. Identify, describe and, where feasible, quantify the key risks and uncertainties in the evaluation (for example, hydrologic and hydraulic uncertainty, cost uncertainty, uncertainty in model inputs, nonstructural participation rates, future land use), their likelihood and magnitude, and how they could cause outcomes to vary over time from the estimates. State the modeling software used and reference the appendix with full methods. Note whether improved data or models were considered and the costs and advantages of reducing uncertainty. (33 CFR 234.6(a); 234.6(c)(4); 234.7(d); 234.10(c)(4))",
+        "example": "Effectiveness of alternative plans was measured in percent of flood damages reduced. The alternatives were modeled using economic modeling software (HEC-FDA), and the results are shown in Table 22. More information on the modeling process and inputs are described in Appendix B. The Valley View Plan, Bypass Plan, and Combination Plan are most effective at reducing damages, while the Lower Scope Plan and Nonstructural Plan show the greatest remaining residual risk (i.e. risk that remains after the project is in place).\n\nTable 22. With-Project expected annual damages (residual risk) by damage category ($1,000s) for final array of alternatives.\n\n| Alternative | Total With-Project Damages | Damages Reduced | % Damages Reduced |\n|---|---|---|---|\n| 1. No Action | $22,528 | - | - |\n| 2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | $467 | $22,061 | 98% |\n| 3b – Modified Bypass Plan (previous authorized plan, partially constructed) | $649 | $21,879 | 97% |\n| 4 - Nonstructural Plan | $12,610 | $9,918 | 43% |\n| 7 – Low Scope Plan | $2,457 | $20,071 | 87% |\n| 8b – Combination Plan | $939 | $21,589 | 95% |\n\n... For nonstructural measures on private properties, i.e. elevation of residences and dry floodproofing of privately owned commercial properties, individual property owners must opt-in to participate in the plan to manage flood risk at their property. The rate at which property owners participate, or participation rate, affects the effectiveness of the plan. As such, the participation rate will affect benefits and residual risk of the Nonstructural Plan.",
+        "required": true
+      },
+      {
+        "name": "Environmental Effects and Ecosystem Services",
+        "summary": "For each alternative, evaluate the key environmental benefits and costs relative to the No Action alternative, using the current condition of the affected ecosystem as the baseline and projecting it over the period of analysis. Describe the evaluation method (for example, habitat suitability or habitat unit modeling, certified or approved models, evaluation species or indicators, variables used) and why it was chosen. Report quantified outputs (for example, habitat units or acres by quality class) and how they change over time, monetize ecosystem services where practicable, and qualitatively describe effects that cannot be quantified. Cover other significant environmental effects relevant to the decision (for example, cultural resources, air emissions, floodplain functions). Identify unavoidable adverse effects and the mitigation included in each alternative. State when an alternative was not modeled and why. Reference the appendix and the environmental consequences chapter for full details. (33 CFR 234.6(c)(3); 234.7(b)(1)-(2); 234.8(d); 234.9(a); 234.9(c))",
+        "example": "3.5.3 Environmental Quality (EQ) Analysis\nTo characterize net changes to the Environmental Quality (EQ) account, the study evaluated impacts to existing habitat and benefits from creation of new habitat for aquatic and riparian species, while maximizing use of existing data and previously certified models. The analysis combined two separate elements: 1) a hydraulic modeling based aquatic habitat suitability evaluation, and 2) a habitat suitability index (HSI) for the yellow warbler (Figure 30). The yellow warbler HSI is an already USACE-certified model, and the team worked with the Ecosystem Restoration Planning Center of Expertise (ECO-PCX) to obtain single-use authorization for a hydraulic habitat suitability analysis for steelhead habitat.\n\n[Figure 30: Generalized habitat modeling methodology schematic]\n\n... Table 25 below summarizes the habitats, species, and variables used in this analysis. The results of the analyses are briefly summarized below, and a complete write-up of the habitat analysis can be found in Appendix C1.\n\nTable 25. Habitat type, species, and habitat variables used in the EQ analysis.\n\n| Habitat Type | Evaluation Species | Habitat Variables |\n|---|---|---|\n| Riverine | rearing and spawning steelhead | Depth, velocity, substrate and cover |\n| Riparian Forest | yellow warbler | Percent canopy cover, average canopy height |\n\nIn general, the analysis found that the Combination and Lower Scope plans improve riparian habitat, while the Bypass and Valley View plans cause some riparian habitat degradation over time. For the Combination Plan, there is some reduction in habitat with the initial clearing and grubbing, but this habitat comes back within 5 years and then is substantially improved after 10 years of vegetation growth.\n\n[Figure 31: Riparian habitat change from the project action alternatives]\n\nFor aquatic habitat, the analysis found that the alternatives generally perform somewhat similar to each other (Table 26). ...\n\nTable 26. Results of rearing habitat analysis for project alternatives.\n\n| Plan | Low HSI (0.01 to 0.33) | Medium HSI (0.33 to 0.67) | High HSI (0.67 to 1) | Total med and high habitat (acres) | Change med and high (acres) |\n|---|---|---|---|---|---|\n| FWOP | 6.58 | 11.25 | 3.29 | 14.54 | 0 |\n| 2b – Modified Valley View | 6.14 | 13.77 | 3.25 | 17.02 | +2.47 |\n| 3b – Modified Bypass | 6.00 | 12.77 | 3.27 | 16.04 | +1.49 |\n| 7 -Low Scope | 6.58 | 11.16 | 3.31 | 14.47 | -0.08 |\n| 8b- Combo | 6.26 | 12.01 | 3.47 | 15.47 | +0.93 |\n\nThe Nonstructural Plan (Alternative 4) is not expected to affect the EQ as it does not include in-channel work which would impact rearing nor aquatic habitat. Thus, it was not included in the EQ modeling.",
+        "required": true
+      },
+      {
+        "name": "Public Safety and Life Safety",
+        "summary": "For each alternative, evaluate effects on significant risks to public safety, including loss of life and injury, under existing and future conditions. Report the population at risk and exposed structures (by occupancy type and flood event or hazard frequency) for the No Action alternative, and how each alternative changes them. Describe the life safety method and criteria used (for example, life loss modeling software, depth and velocity hazard thresholds) and its limitations, and identify residual life safety hazards and how they would be managed and communicated. Evaluate effects on critical infrastructure and community resilience. Monetize or quantify where practicable and describe qualitatively otherwise. (33 CFR 234.6(c)(4); 234.7(b)(2); 234.9(a); 234.9(c))",
+        "example": "The population at risk (PAR) is approximately 3,490 persons in the 1% ACE floodplain and 5,726 persons in the 0.2 % floodplain (excluding unhoused persons). ... Table 27 shows the structure distribution, PAR, maximum depths, and total damages at structure by occupancy type at the 1% AEP and the 0.2% AEP events.\n\nTable 27. Population at risk (PAR), structure distribution, maximum depth, and total damages for the 1% and 0.2% AEP flood events.\n\n| Occupancy Type | PAR 1% AEP | PAR 0.2% AEP | Max Depth 1% AEP (ft) | Max Depth 0.2% AEP (ft) | Total Damages 1% AEP | Total Damages 0.2% AEP |\n|---|---|---|---|---|---|---|\n| Autos | 7,553 | 9,996 | 8.3 | 9.4 | $72 M | $118 M |\n| Commercial | 81 | 136 | 3.3 | 4.7 | $35 M | $93 M |\n| Industrial | 118 | 174 | 4.4 | 5.5 | $82 M | $130 M |\n| Public | 21 | 29 | 2.5 | 3.3 | $63 M | $88 M |\n| Residential | 1,175 | 1,928 | 6.4 | 7.9 | $323 M | $472 M |\n| Population at Residential Structures | 3,490 | 5,726 | | | | |\n\nLife safety was evaluated using LifeSim 2.0 criteria. This analysis does not consider the life safety risk to persons in structures or in vehicles on roadways; rather, the analysis assumes a \"worst case scenario\" event where persons are openly caught in fast-moving and deep floodwater. The LifeSim default stability criteria function was used to classify depth, velocity, and velocity-depth combinations into \"low,\" \"high,\" and \"moderate\" life safety hazard zones. The critical threshold for velocity was set to 9.8 ft/s, while the critical threshold for velocity*depth was set to 6.46 ft squared/s. The critical threshold for depth is 4 ft. ...\n\nAll structural alternatives successfully minimize the high and moderate life safety hazard zones in the study area (Figure 34 and Figure 35). While this is not a substitute for LifeSim 2.0, the analysis is informative of the magnitude of potential consequences related to life safety hazards in the study area and what each plan does to reduce the residual risk of flooding. ...\n\n[Figure 34: Life Safety Hazard Zones for the Valley View (left) and Combination (right) Plans, 1% AEP]\n\nThe OSE analysis also considered critical infrastructure resiliency. There are 11 structures flagged as critical infrastructure in the FWOP 0.2% AEP event floodplain, including the Canoas Creek Elementary School that will be impacted by flooding at less than 3ft of flood depths. The nonstructural alternative removes two critical structures from the floodplain while the other nine remain unprotected. The structural alternatives remove all 11 critical structures from the floodplain.",
+        "required": true
+      },
+      {
+        "name": "Environmental Justice and Distributional Effects",
+        "summary": "Identify communities with environmental justice concerns in the study area and state the screening tool and data used. For each alternative, display and disclose its effects on these communities, both beneficial and adverse, compared with other affected areas (for example, change in population at risk in disadvantaged versus other areas, displacement, community cohesion). Identify any disproportionate adverse public safety, health or environmental burdens and how they would be avoided, minimized or mitigated. Describe other distributional effects that inform the decision, such as how benefits and costs accrue across time, places and beneficiary groups, and summarize preferences elicited from affected communities. Keep these displays separate from the net public benefits calculation. (33 CFR 234.6(c)(1); 234.9(a); 234.10(a)(1)-(3); 234.10(c)(3))",
+        "example": "Because the Administration's default Quality Climate and Economic Justice Screening Tool (CEJST) is still in beta version, the CDC's Social Vulnerability Index (SVI) tool was used to screen for and identify disadvantaged communities for the Upper Guadalupe Flood Risk Management Project. The tool was used to measure impacts to the OSE account from the no-action, nonstructural, and structural alternatives.\n\nSVI data was used to identify socially vulnerable communities and to see how various alternatives would affect the people in each socially vulnerable group (either positively or negatively) as part of the OSE assessment (Figure 32). ...\n\n[Figure 32: Socially vulnerable flooding impact areas]\n\nThe nonstructural alternative considers the elevation of residential structures to the 1% AEP event and 3ft dry floodproofing on commercial structures. While this option would be highly effective at reducing flood risk to damageable property, it would likely not reduce the amount of high and moderate hazard life safety pockets in the area. In addition, such activities would significantly disrupt the community by dispersing residents and business activity. ...\n\nIn general, all structural alternatives are expected to contribute positively to the OSE factors, as defined in the USACE OSE Primer. To assess the impact of each alternative on socially vulnerable groups, the change in the number of persons removed from the 1% AEP floodplain by plan was assessed. All alternatives, excluding the nonstructural alternative, significantly reduce the PAR (Table 28).\n\nTable 28. Percent of persons and structures removed from the 1% AEP by Plan, $0 Damages or Greater (SVI Tool).\n\n| Alternative | Population at Residential Structures in Socially Vulnerable Flooding Impact Areas (Reaches 1, 2, 6, and 7) | Population at Residential Structures in all Other Flooding Impact Areas (3, 4, 5, 8, 9, 10, and 11) | Total Population at Residential Structures in Study Area |\n|---|---|---|---|\n| 2b - Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | -99.3% | -97.9% | -98.6% |\n| 3b - Bypass Plan (previous authorized plan, partially constructed) | -100.0% | -99.8% | -98.9% |\n| 4 - Nonstructural Only | -74.8% | -32.5% | -54.0% |\n| 7 – Low Scope Plan | -100.0% | -80.3% | -71.2% |\n| 8b – Combination Plan | -99.7% | -99.1% | -99.4% |",
+        "required": true
+      },
+      {
+        "name": "Tribal Treaty Rights and Tribal Benefits",
+        "summary": "State whether any alternative in the final array affects Tribal treaty rights or water rights, including impacts identified late in the planning process that would prevent selection of an alternative, and document any alternative screened for that reason. Summarize benefits to federally recognized Tribes as determined in direct consultation with the respective Tribal Nations, as a supplement to the public benefit analysis. Treat Tribal reserved rights as guaranteed rights, not as benefits. If no Tribal rights or interests are affected, say so and state how this was determined. (33 CFR 234.7(i); 234.9(a); 234.9(c); 234.10(a)(3))",
+        "example": "No example available",
+        "required": true
+      },
+      {
+        "name": "Climate Change, Water Availability and Resilience",
+        "summary": "Describe how changing climate conditions were accounted for in evaluating the alternatives, including the climate-informed science approach and the multiple future scenarios used for the without- and with-project conditions. For each alternative, compare its ability to perform under changing conditions (for example, its effectiveness and residual risk under different hydrologic or sea level scenarios) and describe the associated uncertainties. Where relevant to the study purpose, evaluate water availability, competing water uses and resilience across a range of conditions from drought to flood. (33 CFR 234.6(g)(3)-(4); 234.7(f); 234.7(g); 234.10(a))",
+        "example": "No example available",
+        "required": true
+      },
+      {
+        "name": "Performance Against Study Objectives and Formulation Criteria",
+        "summary": "For each alternative, state how well it meets each planning objective of the study. Then systematically evaluate each alternative against the four formulation criteria, using quantitative and qualitative evidence: completeness (whether all features and actions by others needed to realize the effects are included, including any dependence on participation by others), effectiveness (extent to which it alleviates the problems and achieves the opportunities), efficiency (extent to which it does so at least cost) and acceptability (viability and appropriateness from the perspective of the Nation's general public and consistency with Federal laws and policies, including State water law, international obligations and any required changes to law or policy). Identify legal constraints that would preclude selection of an otherwise viable alternative. A table rating each alternative against each criterion is recommended. (33 CFR 234.2; 234.6(h); 234.7(j)-(k); 234.8(e); 234.9(b)(2)-(3); 234.10(c)(1))",
+        "example": "Effectiveness of alternative plans was measured in percent of flood damages reduced. ... The Valley View Plan, Bypass Plan, and Combination Plan are most effective at reducing damages, while the Lower Scope Plan and Nonstructural Plan show the greatest remaining residual risk (i.e. risk that remains after the project is in place).\n\nThe Valley View and Bypass plans may be difficult to identify sufficient space for required mitigation. The Combination, Low Scope, and Nonstructural plans were found to be highly acceptable and implementable. Mitigation is expected to be contained within the flood risk management footprint.\n\nAll alternative plans in the final array are expected to be complete plans that would not require further action from other to implement. For nonstructural measures on private properties, i.e. elevation of residences and dry floodproofing of privately owned commercial properties, individual property owners must opt-in to participate in the plan to manage flood risk at their property.",
+        "required": true
+      },
+      {
+        "name": "Contributions to the Guiding Principles",
+        "summary": "Assess and summarize how each alternative contributes to each of the six Guiding Principles: healthy and resilient ecosystems, sustainable economic development, floodplains (including floodplain resilience, avoiding unwise use of floodplains and effects on natural and beneficial floodplain functions), public safety, environmental justice and the watershed approach (upstream and downstream effects and interaction with other projects in the watershed). Draw on the results of the preceding sections rather than repeating them, and present a table indicating the extent to which each Guiding Principle is achieved by each alternative. (33 CFR 234.6(a); 234.6(c)(1)-(6); 234.9(a); 234.9(b); 234.10(c)(5))",
+        "example": "No example available",
+        "required": true
+      },
+      {
+        "name": "Regional Economic Development Effects",
+        "summary": "If regional economic development effects were analyzed, report for each alternative the regional effects of project expenditures (for example, output, jobs, labor income and value added or gross regional product), the region analyzed, the modeling tool, the cost basis and price level used. State clearly that these effects are transfers within the national economy, are displayed separately, and are not included in the net public benefits calculation or used to develop the net public benefits alternative. (33 CFR 234.2 (definition of regional economic development effects); 234.8(a)(5); 234.10(a)(2))",
+        "example": "3.5.2 Regional Economic Development (RED) Analysis\nThe RED analysis estimates number of jobs and other economic measures such as labor income, value added, and sales that are supported by future implementation of alternative plans. The team completed modeling to evaluate the regional economic impact and project expenditures, activities, and infrastructure. The results of this analysis are presented in Table 23 and Table 24, and Appendix B provides additional details.\n\nConstruction costs were used to estimate the regional economic impacts of all alternatives in Santa Clara County. Generally, the higher the cost of construction, the higher the RED benefits for that alternative. ...\n\nTable 23. Construction costs, 2020 price level.\n\n| Alternative | Construction Cost |\n|---|---|\n| 2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | $200.1 M |\n| 3b – Modified Bypass Plan (previous authorized plan, partially constructed) | $319.4.M |\n| 4 - Nonstructural Only Plan | $260.8 M |\n| 7 – Low Scope Plan | $50.9 M |\n| 8b – Combination Plan | $71.8 M |\n\nTable 24. Comparison of alternatives in RED, local impacts, 2022 price level.\n\n| Alternative | Output | Jobs | Labor Income | Gross Regional Product* |\n|---|---|---|---|---|\n| 2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | $233.7 M | 1,543.5 | $147.4 M | $164.5 M |\n| 3b – Modified Bypass Plan (previous authorized plan, partially constructed) | $373.1M | 2,463.3 | $235.3 M | $262.5 M |\n| 4 – Modified Nonstructural Only | $304.6 M | 2,011 | $192 M | $214.3 M |\n| 7 – Low Scope Plan | $59.4 M | 392.8 | $37.5 M | $41.8 M |\n| 8b – Combination Plan | $83.9 M | 554.5 | $52.9 M | $59 M |\n\n*Gross Regional product is defined as the sum of employee compensation, proprietor income, other property type income, and indirect business taxes.",
+        "required": false
+      },
+      {
+        "name": "Adaptive Management Measures",
+        "summary": "Where commensurate with the significance of the proposed action and available resources, identify the adaptive management measures included in each alternative, the uncertainties they address, how they would be monitored and triggered, and how they were evaluated as part of the alternative (including their costs). (33 CFR 234.7(e))",
+        "example": "No example available",
+        "required": false
+      }
+    ]
+  },
+  {
+    "id": "PLAN_EVAL",
+    "name": "Plan Evaluation",
+    "regulation": "Economic and Environmental Principles and Guidelines for Water and Related Land Resources Implementation Studies (1983), as implemented by USACE ER 1105-2-100 Planning Guidance Notebook",
+    "regulationUrl": "https://webarchive.library.unt.edu/web/20130218063957/http:/publications.usace.army.mil/publications/eng-regs/ER_1105-2-100/toc.pdf",
+    "sections": [
+      {
+        "name": "Evaluation Framework",
+        "summary": "Introduces how the final (focused) array of alternatives was evaluated. Describes the comparison of\nwith-project and without-project conditions, lists the Principles and Guidelines evaluation criteria\n(efficiency, effectiveness, acceptability, completeness) and the four accounts (NED, RED, EQ, OSE),\nstates which resources or metrics were considered under each account for this study, and cites the\npolicy guidance requiring comprehensive documentation of benefits. Largely standard text; the\nproject-specific parts are the alternatives evaluated and the metrics chosen for each account.\n",
+        "example": "The focused array of alternatives, as described above, was evaluated by projecting and comparing the\nwith project and without project conditions. Plan formulation focused on addressing the identified\nproblems and meeting study objectives, including those responsive to national, state, and local concerns.\nAlternative plans were assessed to determine if they have net benefits in total and by type. The four\naction-alternatives carried into the final array were evaluated on the Principles and Guidelines Criteria of:\n\n- Efficiency – The potential benefits/outcome of the measure are greater than what could be provided by another measure/plan of equal or greater cost.\n- Effectiveness – Extent to which a measure or alternative alleviates problem areas and meets planning objectives.\n- Acceptability – Viability and appropriateness of an alternative from the perspective of the general public and consistency with existing Federal laws, authorities, and public policies.\n- Completeness – Extent to which an alternative provides and accounts for all features, investments, and/or other actions necessary to realize the planned effects, including any necessary actions by others.\n\nAdditionally, plans were assessed on the Principles and Guidelines four accounts:\n\n- National Economic Development (NED) – the value of national output of goods and services\n- Regional Economic Development (RED) – changes in regional income and employment\n- Environmental Quality (EQ) – riparian habitat, aquatic habitat, cultural resources, and trucking air emissions from sediment disposal offsite\n- Other Social Effects (OSE) – life safety, environmental justice, and critical infrastructure resiliency\n\nComprehensive documentation of total benefits of project alternatives, including equal consideration of\neconomic, environmental, and social categories has been undertaken in accordance with the Assistant\nSecretary for the Army for Civil Works (ASACW) Policy Directive on the \"Comprehensive Documentation of\nBenefits in Decision Document,\" dated 5 January 2021.\n",
+        "required": true
+      },
+      {
+        "name": "National Economic Development (NED) Analysis",
+        "summary": "The purpose of this section is to compare and contrast different alternative plans or flood scenarios for\ntheir cost effectiveness at a national level (the P&G efficiency criterion), measured in terms of net benefits. For each\nalternative, report average annual costs (construction plus OMRR&R), average annual benefits, net annual\nbenefits (benefits minus costs) and the benefit-cost ratio, and identify the plan with the highest net\nbenefits. State the modeling tool used for expected annual damages, the price level, the period of\nanalysis and the discount rate.\n",
+        "example": "The final array alternatives were evaluated for their cost effectiveness, measured in terms of net benefits,\ncalculated by subtracting the annual costs from the expected annual economic benefits (Table 21). The\nCombination Plan had the highest net annual benefits of the alternatives considered in the final array.\n\nNED analysis assesses how the alternatives in the final array may reasonably maximize expected net\nbenefits. The net benefits are computed as the annualized flood damage reduction benefits gained minus\nthe annualized cost of construction and Operations, Maintenance, Repair, Rehabilitation and Replacement\n(OMRR&R). Expected annual damages were estimated using the HEC-FDA computer program. Net\nbenefit computations for the focused array were evaluated based on October 2023 price levels.\n\nTable 21. Economic net benefits and benefit cost ratio (BCR) of alternatives carried forward.\n\n| Alternative | Average Annual Costs | Average Annual Benefits | Net Annual Benefits | Benefit to Cost Ratio |\n|---|---|---|---|---|\n| 2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | $14.0M | $22.1M | $8.1M | 1.6 |\n| 3b – Modified Bypass Plan (previous authorized plan, partially constructed) | $21.2M | $21.9M | $0.7M | 1.0 |\n| 4 - Nonstructural Plan | $9.9M | $9.2M | $0.7M | 1.1 |\n| 7 – Low Scope Plan | $5.5M | $20.1M | $14.6M | 3.7 |\n| 8b – Combination Plan | $6.4M | $21.6M | $15.2M | 3.4 |\n\nFiscal Year (FY) 2023 price levels, 50-year period of analysis, 2.5% discount rate\n",
+        "required": true
+      },
+      {
+        "name": "Effectiveness and Residual Risk",
+        "summary": "Measures how well each alternative alleviates the problem (the P&G effectiveness criterion). For flood risk\nmanagement studies this is the percent of expected annual flood damages reduced and the residual risk\n(damages that remain with the project in place), compared against the No Action alternative. Identify which\nalternatives are most and least effective and reference the appendix documenting the modeling.\n",
+        "example": "Effectiveness of alternative plans was measured in percent of flood damages reduced. The alternatives\nwere modeled using economic modeling software (HEC-FDA), and the results are shown in Table 22.\nMore information on the modeling process and inputs are described in Appendix B. The Valley View\nPlan, Bypass Plan, and Combination Plan are most effective at reducing damages, while the Lower Scope\nPlan and Nonstructural Plan show the greatest remaining residual risk (i.e. risk that remains after the\nproject is in place).\n\nTable 22. With-Project expected annual damages (residual risk) by damage category ($1,000s) for final\narray of alternatives.\n\n| Alternative | Total With-Project Damages | Damages Reduced | % Damages Reduced |\n|---|---|---|---|\n| 1. No Action | $22,528 | - | - |\n| 2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | $467 | $22,061 | 98% |\n| 3b – Modified Bypass Plan (previous authorized plan, partially constructed) | $649 | $21,879 | 97% |\n| 4 - Nonstructural Plan | $12,610 | $9,918 | 43% |\n| 7 – Low Scope Plan | $2,457 | $20,071 | 87% |\n| 8b – Combination Plan | $939 | $21,589 | 95% |\n",
+        "required": true
+      },
+      {
+        "name": "Acceptability and Completeness",
+        "summary": "Addresses the remaining P&G criteria. Acceptability: whether each alternative is implementable and\nacceptable to the public, agencies and existing law and policy (e.g. space for mitigation, real estate\nconstraints). Completeness: whether each alternative includes everything needed to realize its benefits,\nincluding actions required by others (e.g. voluntary participation by property owners in nonstructural\nmeasures) and how that dependency affects benefits and residual risk.\n",
+        "example": "The Valley View and Bypass plans may be difficult to identify sufficient space for required mitigation.\nThe Combination, Low Scope, and Nonstructural plans were found to be highly acceptable and\nimplementable. Mitigation is expected to be contained within the flood risk management footprint.\n\nAll alternative plans in the final array are expected to be complete plans that would not require further\naction from other to implement. For nonstructural measures on private properties, i.e. elevation of\nresidences and dry floodproofing of privately owned commercial properties, individual property owners\nmust opt-in to participate in the plan to manage flood risk at their property. The rate at which property\nowners participate, or participation rate, affects the effectiveness of the plan. As such, the participation\nrate will affect benefits and residual risk of the Nonstructural Plan.\n",
+        "required": true
+      },
+      {
+        "name": "Regional Economic Development (RED) Analysis",
+        "summary": "Estimates the regional economic impact of constructing each alternative: output, jobs, labor income and\ngross regional product supported by project expenditures within the study region. Present construction\ncosts per alternative and a comparison of RED results, rank the alternatives, and note the region analyzed,\nthe price level and the appendix with details. RED effects are typically proportional to construction cost.\n",
+        "example": "The RED analysis estimates number of jobs and other economic measures such as labor income, value\nadded, and sales that are supported by future implementation of alternative plans. The team completed\nmodeling to evaluate the regional economic impact and project expenditures, activities, and infrastructure.\nThe results of this analysis are presented in Table 23 and Table 24, and Appendix B provides additional\ndetails.\n\nConstruction costs were used to estimate the regional economic impacts of all alternatives in Santa Clara\nCounty. Generally, the higher the cost of construction, the higher the RED benefits for that alternative.\nTable 23 shows the construction costs for all plans. The Bypass Plan (Alt 3b) produces the highest\namount of output ($373.1 M), followed by the Nonstructural Plan (alt 4) ($304.6 M), the Valley View\nPlan (Alt 2b) ($233.7 M), the Combination Plan (Alt 8b) ($83.9 M), and the Lower Scope Plan (Alt 7)\n($59.4 M) (Table 24).\n\nTable 23. Construction costs, 2020 price level.\n\n| Alternative | Construction Cost |\n|---|---|\n| 2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | $200.1 M |\n| 3b – Modified Bypass Plan (previous authorized plan, partially constructed) | $319.4 M |\n| 4 - Nonstructural Only Plan | $260.8 M |\n| 7 – Low Scope Plan | $50.9 M |\n| 8b – Combination Plan | $71.8 M |\n\nTable 24. Comparison of alternatives in RED, local impacts, 2022 price level.\n\n| Alternative | Output | Jobs | Labor Income | Gross Regional Product* |\n|---|---|---|---|---|\n| 2b – Modified Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | $233.7 M | 1,543.5 | $147.4 M | $164.5 M |\n| 3b – Modified Bypass Plan (previous authorized plan, partially constructed) | $373.1 M | 2,463.3 | $235.3 M | $262.5 M |\n| 4 – Modified Nonstructural Only | $304.6 M | 2,011 | $192 M | $214.3 M |\n| 7 – Low Scope Plan | $59.4 M | 392.8 | $37.5 M | $41.8 M |\n| 8b – Combination Plan | $83.9 M | 554.5 | $52.9 M | $59 M |\n\n*Gross Regional product is defined as the sum of employee compensation, proprietor income, other\nproperty type income, and indirect business taxes.\n",
+        "required": true
+      },
+      {
+        "name": "Environmental Quality (EQ) Analysis Methodology",
+        "summary": "Describes how net changes to the Environmental Quality account were measured: the habitat types\nevaluated, the models used (and their USACE certification or single-use approval status), the evaluation\nspecies selected for each habitat and why, and the habitat variables each model uses. Reference the\nappendix with the full habitat analysis.\n",
+        "example": "To characterize net changes to the Environmental Quality (EQ) account, the study evaluated impacts to\nexisting habitat and benefits from creation of new habitat for aquatic and riparian species, while\nmaximizing use of existing data and previously certified models. The analysis combined two separate\nelements: 1) a hydraulic modeling based aquatic habitat suitability evaluation, and 2) a habitat suitability\nindex (HSI) for the yellow warbler. The yellow warbler HSI is an already USACE-certified model, and the\nteam worked with the Ecosystem Restoration Planning Center of Expertise (ECO-PCX) to obtain single-use\nauthorization for a hydraulic habitat suitability analysis for steelhead habitat.\n\nRepresentative evaluation species were selected for each habitat type based on several criteria: (1) species\nknown to be sensitive to specific land- and water- use actions; (2) species that play a key role in nutrient\ncycling or energy flow; (3) species that utilize a common environmental resource; (4) species that are\nassociated with important resource problems, such as anadromous fish and migratory birds; (5) species\nthat have existing habitat response models suitable for the evaluation of proposed alternatives; (6) habitat\ndata available or easily collected to support modeling; (7) species that provide relevant evaluation\nthroughout the geographic range of proposed alternatives and across the broad range of effects of\nproposed alternative. Table 25 below summarizes the habitats, species, and variables used in this analysis.\nA complete write-up of the habitat analysis can be found in Appendix C1.\n\nTable 25. Habitat type, species, and habitat variables used in the EQ analysis.\n\n| Habitat Type | Evaluation Species | Habitat Variables |\n|---|---|---|\n| Riverine | rearing and spawning steelhead | Depth, velocity, substrate and cover |\n| Riparian Forest | yellow warbler | Percent canopy cover, average canopy height |\n",
+        "required": true
+      },
+      {
+        "name": "Environmental Quality (EQ) Analysis Results",
+        "summary": "Reports the habitat outcomes for each alternative relative to the future without-project condition, one\nhabitat type at a time (e.g. riparian, aquatic): habitat units or acres gained or lost, how habitat changes\nover time after construction, which alternatives improve or degrade habitat and why, opportunities to\nimprove habitat through design refinement, and any alternatives excluded from EQ modeling and why.\n",
+        "example": "In general, the analysis found that the Combination and Lower Scope plans improve riparian habitat,\nwhile the Bypass and Valley View plans cause some riparian habitat degradation over time. For the\nCombination Plan, there is some reduction in habitat with the initial clearing and grubbing, but this\nhabitat comes back within 5 years and then is substantially improved after 10 years of vegetation growth.\n\nFor aquatic habitat, the analysis found that the alternatives generally perform somewhat similar to each\nother (Table 26). The Bypass and Valley View plans provide the most habitat as analyzed here because\nthey widen the low-flow channel throughout the study area. This appears favorable because the analysis\nused depths and velocities during relatively low flows (mean winter and mean spring flow for spawning\nand rearing, respectively) to evaluate habitat. There is significant opportunity to refine designs to improve\nthe provision of aquatic habitat, particularly through the use of selective floodplain grading and pool-\nforcing large wood structures in Reaches 7 and 8.\n\nTable 26. Results of rearing habitat analysis for project alternatives (acreage of steelhead rearing habitat\nby HSI class).\n\n| Plan | Low HSI (0.01 to 0.33) | Medium HSI (0.33 to 0.67) | High HSI (0.67 to 1) | Total med and high habitat (acres) | Change med and high (acres) |\n|---|---|---|---|---|---|\n| FWOP | 6.58 | 11.25 | 3.29 | 14.54 | 0 |\n| 2b – Modified Valley View | 6.14 | 13.77 | 3.25 | 17.02 | +2.47 |\n| 3b – Modified Bypass | 6.00 | 12.77 | 3.27 | 16.04 | +1.49 |\n| 7 - Low Scope | 6.58 | 11.16 | 3.31 | 14.47 | -0.08 |\n| 8b - Combo | 6.26 | 12.01 | 3.47 | 15.47 | +0.93 |\n\nThe Nonstructural Plan (Alternative 4) is not expected to affect the EQ as it does not include in-channel\nwork which would impact rearing nor aquatic habitat. Thus, it was not included in the EQ modeling.\n",
+        "required": true
+      },
+      {
+        "name": "Other Social Effects (OSE): Social Vulnerability Screening",
+        "summary": "Introduces the OSE account and identifies socially vulnerable or disadvantaged communities in the study\narea. Cite the governing guidance, name the screening tool used (e.g. CDC Social Vulnerability Index) and\nwhy it was chosen, describe what the tool measures, and identify which areas of the study area are\nmoderately or highly vulnerable.\n",
+        "example": "Because the Administration's default Climate and Economic Justice Screening Tool (CEJST) is still in\nbeta version, the CDC's Social Vulnerability Index (SVI) tool was used to screen for and identify\ndisadvantaged communities for the Upper Guadalupe Flood Risk Management Project. The tool was used\nto measure impacts to the OSE account from the no-action, nonstructural, and structural alternatives.\n\nSVI data was used to identify socially vulnerable communities and to see how various alternatives would\naffect the people in each socially vulnerable group (either positively or negatively) as part of the OSE\nassessment. The SVI uses U.S. Census data to determine the relative social vulnerability of every census\ntract. It ranks each tract on 14 social factors and identifies and maps communities most likely needing\nsupport during and after a hazardous event such as flooding. These factors are aggregated into four main\n\"themes:\" Socioeconomic, Household Composition and Disability, Minority Status and Language, and\nHousing Type and Transportation. The sum of all four themes reflects the overall percentile tract summary\nranking, or overall theme, for each Census tract.\n",
+        "required": true
+      },
+      {
+        "name": "Other Social Effects (OSE): Population at Risk",
+        "summary": "Quantifies who and what is exposed to flooding under without-project conditions: population at risk (PAR)\nin the relevant floodplains (e.g. 1% and 0.2% AEP), how much of the PAR lives in socially vulnerable\nareas, structure counts, maximum flood depths and total damages by occupancy type, and any populations\nnot captured by structure inventories (e.g. unhoused persons living in or near the channel).\n",
+        "example": "The population at risk (PAR) is approximately 3,490 persons in the 1% ACE floodplain and 5,726\npersons in the 0.2% floodplain (excluding unhoused persons). There is a large population of socially\nvulnerable people residing in the 1% AEP event; approximately half of the PAR reside in moderate to\nhigh socially vulnerable areas, which are identified as Flooding Impact Areas 1, 2, 6, and 7. Table 27\nshows the structure distribution, PAR, maximum depths, and total damages at structure by occupancy\ntype at the 1% AEP and the 0.2% AEP events.\n\nTable 27. Population at risk (PAR), structure distribution, maximum depth, and total damages for the 1%\nand 0.2% AEP flood events.\n\n| Occupancy Type | PAR 1% AEP | PAR 0.2% AEP | Max Depth 1% AEP (ft) | Max Depth 0.2% AEP (ft) | Total Damages 1% AEP | Total Damages 0.2% AEP |\n|---|---|---|---|---|---|---|\n| Autos | 7,553 | 9,996 | 8.3 | 9.4 | $72 M | $118 M |\n| Commercial | 81 | 136 | 3.3 | 4.7 | $35 M | $93 M |\n| Industrial | 118 | 174 | 4.4 | 5.5 | $82 M | $130 M |\n| Public | 21 | 29 | 2.5 | 3.3 | $63 M | $88 M |\n| Residential | 1,175 | 1,928 | 6.4 | 7.9 | $323 M | $472 M |\n| Population at Residential Structures | 3,490 | 5,726 | | | | |\n\nAnother component of the PAR is comprised of encampments living in or near the channel, where\nvelocities, depths, and velocity-depth combinations pose a significant life safety hazard to transient,\nvulnerable persons. There are approximately 33 unhoused encampments and over 130 persons that will\nlikely be touched by open floodwater at the 1% AEP event. Ten of the 33 affected camps are likely to\nexperience moderate or high risk flood velocities and depths.\n",
+        "required": true
+      },
+      {
+        "name": "Other Social Effects (OSE): Life Safety",
+        "summary": "Describes how life safety risk was evaluated and what it shows for each alternative: the method and\ncriteria used (e.g. LifeSim depth, velocity and velocity-depth thresholds), how hazard zones are classified,\nthe limitations and assumptions of the analysis, whether each alternative reduces high and moderate\nhazard zones, where residual hazards remain, and any further life safety analysis planned.\n",
+        "example": "Life safety was evaluated using LifeSim 2.0 criteria. This analysis does not consider the life safety risk to\npersons in structures or in vehicles on roadways; rather, the analysis assumes a \"worst case scenario\"\nevent where persons are openly caught in fast-moving and deep floodwater. The LifeSim default stability\ncriteria function was used to classify depth, velocity, and velocity-depth combinations into \"low,\" \"high,\"\nand \"moderate\" life safety hazard zones. The critical threshold for velocity was set to 9.8 ft/s, while the\ncritical threshold for velocity*depth was set to 6.46 ft squared/s. The critical threshold for depth is 4 ft.\nIf the velocity and velocity*depth thresholds are exceeded, this would constitute a \"high\" life safety\nhazard zone. If the depth threshold is exceeded, this would constitute a \"moderate\" life safety hazard zone\nbecause the risk to life would be dependent upon if pedestrians could or could not swim. The PDT fully\nintends to implement a LifeSim 2.0 assessment post-TSP and will conduct a breach analysis to determine\nthe incremental life loss of project implementation.\n\nAll structural alternatives successfully minimize the high and moderate life safety hazard zones in the\nstudy area. While this is not a substitute for LifeSim 2.0, the analysis is informative of the magnitude of\npotential consequences related to life safety hazards in the study area and what each plan does to reduce\nthe residual risk of flooding. Most of the residual flooding has shallow depths and low velocities, but the\nLower Scope plan does have residual life safety hazard zones in flooding impact area 8.\n",
+        "required": true
+      },
+      {
+        "name": "Other Social Effects (OSE): Effects of Alternatives on Socially Vulnerable Populations",
+        "summary": "Compares how each alternative affects people, with emphasis on socially vulnerable groups: the change in\npopulation removed from the floodplain in vulnerable versus other areas, qualitative social effects such as\ncommunity disruption or loss of cohesion (especially for nonstructural measures like elevation or\nrelocation), and how the alternatives perform against the OSE social factors (health and safety, economic\nvitality, social connectedness, identity, social vulnerability and resiliency, participation, leisure and\nrecreation).\n",
+        "example": "The nonstructural alternative considers the elevation of residential structures to the 1% AEP event and 3ft\ndry floodproofing on commercial structures. While this option would be highly effective at reducing flood\nrisk to damageable property, it would likely not reduce the amount of high and moderate hazard life\nsafety pockets in the area. In addition, such activities would significantly disrupt the community by\ndispersing residents and business activity. This would adversely impact hundreds of families and\nrelationships in the community.\n\nIn general, all structural alternatives are expected to contribute positively to the OSE factors, as defined in\nthe USACE OSE Primer. To assess the impact of each alternative on socially vulnerable groups, the\nchange in the number of persons removed from the 1% AEP floodplain by plan was assessed. All\nalternatives, excluding the nonstructural alternative, significantly reduce the PAR (Table 28).\n\nTable 28. Percent of persons and structures removed from the 1% AEP by Plan, $0 Damages or Greater\n(SVI Tool).\n\n| Alternative | Population at Residential Structures in Socially Vulnerable Flooding Impact Areas (1, 2, 6, and 7) | Population at Residential Structures in all Other Flooding Impact Areas (3, 4, 5, 8, 9, 10, and 11) | Total Population at Residential Structures in Study Area |\n|---|---|---|---|\n| 2b - Valley View Plan (NED Plan from 1998 FS/EIS/EIR) | -99.3% | -97.9% | -98.6% |\n| 3b - Bypass Plan (previous authorized plan, partially constructed) | -100.0% | -99.8% | -98.9% |\n| 4 - Nonstructural Only | -74.8% | -32.5% | -54.0% |\n| 7 – Low Scope Plan | -100.0% | -80.3% | -71.2% |\n| 8b – Combination Plan | -99.7% | -99.1% | -99.4% |\n",
+        "required": true
+      },
+      {
+        "name": "Other Social Effects (OSE): Critical Infrastructure Resiliency",
+        "summary": "Identifies critical infrastructure (schools, hospitals, emergency services, utilities, transportation) in the\nwithout-project floodplain and reports how many critical facilities each alternative removes from or leaves\nin the floodplain.\n",
+        "example": "The OSE analysis also considered critical infrastructure resiliency. There are 11 structures flagged as\ncritical infrastructure in the FWOP 0.2% AEP event floodplain, including the Canoas Creek Elementary\nSchool that will be impacted by flooding at less than 3ft of flood depths. The nonstructural alternative\nremoves two critical structures from the floodplain while the other nine remain unprotected. The\nstructural alternatives remove all 11 critical structures from the floodplain.\n",
+        "required": false
+      }
+    ]
+  }
+];
+
+const PROJECTS = [
+  { id: 1, name: 'Upper Guadalupe River GRR' },
+  { id: 2, name: 'Lower Mississippi Levee Assessment' }
+];
+
+let FACTS = [
+  { id: 101, projectId: 1, name: 'Population in the 1% floodplain',
+    description: 'Total census population inside the 1% annual chance floodplain.',
+    text: 'An estimated 42,180 people live in census tracts that intersect the 1% annual chance floodplain.',
+    statements: 'SELECT (SUM(?pop) AS ?total) WHERE {\n  ?tract a :CensusTract ; :population ?pop ; :intersects ?fz .\n  ?fz a :FloodZone100 .\n}' },
+  { id: 102, projectId: 1, name: 'Schools at risk of flooding',
+    description: 'Schools located in leveed areas downstream of the study reach.',
+    text: '14 schools serving about 9,300 students are in leveed areas downstream of the study reach.',
+    statements: 'SELECT ?school WHERE { ?school a :School ; :locatedIn ?area . ?area a :LeveedArea }' },
+  { id: 103, projectId: 1, name: 'Hospitals in the floodplain',
+    description: 'Hospitals with critical services inside the floodplain.',
+    text: 'Two hospitals with a combined 610 beds are inside the 1% floodplain.' },
+  { id: 104, projectId: 1, name: 'Expected annual damages, without project',
+    description: 'Expected annual flood damages under the No Action condition.',
+    text: 'Expected annual damages without a project are about $27.4M (FY 2023 price levels).' },
+  { id: 105, projectId: 1, name: 'Socially vulnerable tracts',
+    description: 'Census tracts in the floodplain above the 75th percentile of the CDC SVI.',
+    text: '9 of the 23 floodplain census tracts rank above the 75th percentile of the CDC Social Vulnerability Index.' },
+  { id: 201, projectId: 2, name: 'Channel reach CEMVK_RR_03_ONE_25 impact',
+    description: 'Population affected if channel reach CEMVK_RR_03_ONE_25 floods.',
+    text: 'Flooding of channel reach CEMVK_RR_03_ONE_25 would affect about 18,450 residents across 6 census tracts.' },
+  { id: 202, projectId: 2, name: 'Leveed area real property value',
+    description: 'Real property value protected by the levee system.',
+    text: 'The levee system protects about $2.1B of real property.' }
+];
+
+let SAVED_QUERIES = [
+  { id: 'q1', title: 'Census tracts in the 1% floodplain', results: 23, updatedAt: '11/3/2026, 2:14:09 PM' },
+  { id: 'q2', title: 'Schools in leveed areas', results: 14, updatedAt: '11/4/2026, 9:41:52 AM' },
+  { id: 'q3', title: 'Reaches upstream of CEMVK_RR_03_ONE_25', results: 7, updatedAt: '11/4/2026, 4:02:33 PM' }
+];
+
+const T234 = TEMPLATES.find(t => t.id === 'PLAN_EVAL_234') || TEMPLATES[0];
+
+let nextId = 1;
+const uid = () => 'id' + (nextId++);
+
+let conversations = [
+  {
+    id: uid(), type: 'report', title: 'Upper Guadalupe plan evaluation',
+    report: {
+      templateId: T234.id, projectId: 1, factIds: [101, 102, 103, 104, 105],
+      sectionFacts: {
+        [T234.sections[1].name]: [104],
+        [T234.sections[2].name]: [104],
+        [T234.sections[4].name]: [101, 103],
+        [T234.sections[5].name]: [105, 102]
+      },
+      sectionNotes: {
+        [T234.sections[0].name]: 'Use FY 2023 price levels, a 50-year period of analysis and the 2.5% discount rate throughout. The final array is No Action, Nonstructural, Low Scope and Combination.'
+      }
+    },
+    messages: [
+      { sender: 'user', text: 'Which required sections still need content?' },
+      { sender: 'system', text: 'Using **' + T234.name + '** for the **Upper Guadalupe River GRR**, these required sections have no facts or notes yet:\n\n'
+          + T234.sections.filter((s, i) => s.required && ![0, 1, 2, 4, 5].includes(i)).map(s => '- ' + s.name).join('\n')
+          + '\n\nYou can add facts or notes to them on the left, or I can generate the report now and mark those sections as needing input.' }
+    ],
+    draft: ''
+  },
+  {
+    id: uid(), type: 'exploration', title: 'Flood impact of CEMVK_RR_03...',
+    messages: [
+      { sender: 'user', text: 'What is the total population impacted if channel reach CEMVK_RR_03_ONE_25 floods?' },
+      { sender: 'system', text: 'If channel reach **CEMVK_RR_03_ONE_25** floods, about **18,450 residents** across **6 census tracts** would be affected.\n\n| Census tract | Population |\n|---|---|\n| 22121020100 | 4,210 |\n| 22121020200 | 3,905 |\n| 22121020300 | 3,120 |\n| 22121020400 | 2,870 |\n| 22121020500 | 2,415 |\n| 22121020600 | 1,930 |\n\nThis was saved as the fact *Channel reach CEMVK_RR_03_ONE_25 impact* in **Lower Mississippi Levee Assessment**.' }
+    ],
+    draft: ''
+  },
+  {
+    id: uid(), type: 'exploration', title: 'Schools in leveed areas',
+    messages: [
+      { sender: 'user', text: 'Which schools are in leveed areas downstream of the study reach?' },
+      { sender: 'system', text: 'I found **14 schools** in leveed areas downstream of the study reach, serving about **9,300 students**. The largest are Westside High School (1,840 students) and Alamo Elementary (720 students).' }
+    ],
+    draft: ''
+  }
+];
+
+/* ================= UI state ================= */
+
+const ui = {
+  tab: 'chat',
+  choosing: false,
+  activeId: conversations[0].id,
+  editingId: null,
+  expandedFactId: null,
+  expandedSections: new Set([T234.sections[0].name]),
+  openExamples: new Set(),  // sections whose example <details> is open
+  pending: new Set(),   // conversation ids waiting on a reply
+  focus: null
+};
+
+/* ================= Helpers ================= */
+
+const ICONS = {
+  explore: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 13v-2M11 13V9M14 13v-3"/>',
+  report: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  fact: '<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  right: '<path d="m9 6 6 6-6 6"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  pencil: '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  note: '<path d="M15 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z"/><path d="M15 21v-6h6"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  erase: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+  query: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'
+};
+
+const LOGO = '<svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="3" width="22" height="18" rx="3" fill="#DE1E2E"/><path d="M5 17V9h2v2h2V8h2v3h2V8h2v3h2V9h2v8z" fill="#fff"/></svg>';
+
+const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const active = () => conversations.find(c => c.id === ui.activeId);
+const templateOf = r => TEMPLATES.find(t => t.id === r?.templateId);
+const projectOf = r => PROJECTS.find(p => p.id === r?.projectId);
+const factById = id => FACTS.find(f => f.id === id);
+
+/** Just enough Markdown for the template examples and canned replies. */
+function markdown(src) {
+  const inline = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])[*_](?!\s)(.+?)[*_](?=[\s).,;:]|$)/g, '$1<em>$2</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  const lines = String(src ?? '').split('\n');
+  const out = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (!line.trim()) { i++; continue; }
+
+    if (/^\s*-{3,}\s*$/.test(line)) { out.push('<hr>'); i++; continue; }
+
+    const heading = /^(#{1,3})\s+(.*)$/.exec(line);
+    if (heading) {
+      out.push(`<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>`);
+      i++;
+      continue;
+    }
+
+    if (/^\s*\|/.test(line)) {
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+      const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const body = rows.filter(r => !/^\s*\|[\s:|-]+\|\s*$/.test(r));
+      const [head, ...rest] = body;
+      out.push('<table><thead><tr>' + cells(head).map(c => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>'
+        + rest.map(r => '<tr>' + cells(r).map(c => `<td>${inline(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table>');
+      continue;
+    }
+
+    if (/^\s*([-*]|\d+\.)\s+/.test(line)) {
+      const ordered = /^\s*\d+\./.test(line);
+      const items = [];
+      while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, ''));
+      const tag = ordered ? 'ol' : 'ul';
+      out.push(`<${tag}>` + items.map(it => `<li>${inline(it)}</li>`).join('') + `</${tag}>`);
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      const quote = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) quote.push(lines[i++].replace(/^>\s?/, ''));
+      out.push(`<blockquote>${quote.map(inline).join('<br>')}</blockquote>`);
+      continue;
+    }
+
+    const para = [];
+    while (i < lines.length && lines[i].trim() && !/^(#{1,3}\s|\s*\||\s*([-*]|\d+\.)\s+|>|\s*-{3,}\s*$)/.test(lines[i])) para.push(lines[i++]);
+    out.push(`<p>${para.map(inline).join('<br>')}</p>`);
+  }
+
+  return out.join('');
+}
+
+/* ================= Report logic ================= */
+
+function hasContent(report, section) {
+  return (report.sectionFacts[section.name]?.length ?? 0) > 0 || (report.sectionNotes[section.name]?.trim().length ?? 0) > 0;
+}
+
+function coverage(report) {
+  const required = templateOf(report)?.sections.filter(s => s.required) ?? [];
+  return { covered: required.filter(s => hasContent(report, s)).length, total: required.length };
+}
+
+function unassigned(report) {
+  const template = templateOf(report);
+  const placed = new Set((template?.sections ?? []).flatMap(s => report.sectionFacts[s.name] ?? []));
+  return report.factIds.filter(id => !placed.has(id)).map(factById).filter(Boolean);
+}
+
+function removeFromReport(report, factId) {
+  report.factIds = report.factIds.filter(id => id !== factId);
+  for (const name of Object.keys(report.sectionFacts)) {
+    report.sectionFacts[name] = report.sectionFacts[name].filter(id => id !== factId);
+  }
+}
+
+function buildReport(report) {
+  const template = templateOf(report);
+  const project = projectOf(report);
+  const out = [`# ${template.name}`, `**${project.name}** · draft generated from ${report.factIds.length} facts`, ''];
+  const gaps = [];
+
+  template.sections.forEach((section, index) => {
+    const facts = (report.sectionFacts[section.name] ?? []).map(factById).filter(Boolean);
+    const notes = report.sectionNotes[section.name]?.trim();
+
+    if (!facts.length && !notes) {
+      if (section.required) {
+        gaps.push(section.name);
+        out.push(`## ${index + 1}. ${section.name}`, '> Needs input: no facts or notes were assigned to this required section.', '');
+      }
+      return;
+    }
+
+    out.push(`## ${index + 1}. ${section.name}`);
+    if (notes) out.push(notes, '');
+    if (facts.length) out.push(facts.map(f => f.text).join(' '), '');
+  });
+
+  out.push('---', gaps.length
+    ? `${gaps.length} required section${gaps.length === 1 ? '' : 's'} still need${gaps.length === 1 ? 's' : ''} input. Add facts or notes on the left and generate again, or tell me how to handle ${gaps.length === 1 ? 'it' : 'them'}.`
+    : 'Every required section has content. Ask me to expand, shorten or rewrite any section.');
+
+  return out.join('\n');
+}
+
+const EXPLORE_REPLIES = [
+  'Within the study area there are **23 census tracts** that intersect the 1% annual chance floodplain, with a combined population of about **42,180**.\n\nThis could be saved as a fact for the **Upper Guadalupe River GRR** project.',
+  'There are **2 hospitals** inside the 1% floodplain:\n\n| Hospital | Beds |\n|---|---|\n| Regional Medical Center | 420 |\n| St. Luke\'s Community Hospital | 190 |',
+  'The levee system protects about **$2.1B** of real property across 4 leveed areas. Most of that value (about 68%) is residential.'
+];
+
+const REPORT_REPLIES = [
+  'Sure. I\'ll keep that in mind when drafting. Use **Generate report** when the sections look right, or ask me about any section.',
+  'The **Benefit-Cost Analysis and Net Public Benefits** section should report annualized costs, benefits, net benefits and the benefit-cost ratio for each alternative, with the price level, period of analysis and discount rate stated in a footnote.'
+];
+
+let replyIndex = { exploration: 0, report: 0 };
+
+function send(conv, text, reply) {
+  text = text.trim();
+  if (!text || ui.pending.has(conv.id)) return;
+
+  conv.messages.push({ sender: 'user', text });
+
+  if (conv.title === 'New chat' || conv.title === 'New report') {
+    conv.title = text.length > 28 ? text.substring(0, 28) + '...' : text;
+  }
+
+  ui.pending.add(conv.id);
+  render();
+
+  setTimeout(() => {
+    const list = conv.type === 'report' ? REPORT_REPLIES : EXPLORE_REPLIES;
+    conv.messages.push({ sender: 'system', text: reply ? reply() : list[replyIndex[conv.type]++ % list.length] });
+    ui.pending.delete(conv.id);
+    render();
+  }, reply ? 1400 : 900);
+}
+
+function newConversation(type) {
+  const conv = {
+    id: uid(), type, title: type === 'report' ? 'New report' : 'New chat', messages: [], draft: '',
+    report: type === 'report' ? { templateId: null, projectId: null, factIds: [], sectionFacts: {}, sectionNotes: {} } : undefined
+  };
+  conversations.unshift(conv);
+  ui.activeId = conv.id;
+  ui.tab = 'chat';
+  ui.choosing = false;
+  ui.expandedSections.clear();
+  return conv;
+}
+
+/* ================= Rendering ================= */
+
+function renderSidebar() {
+  const tabs = [['chat', 'Chat History'], ['queries', 'Saved Queries'], ['facts', 'Facts']];
+  let html = '<div class="sidebar-tabs" role="tablist">'
+    + tabs.map(([id, label]) => `<button type="button" role="tab" class="sidebar-tab ${ui.tab === id ? 'active' : ''}" aria-selected="${ui.tab === id}" data-action="tab" data-tab="${id}">${label}</button>`).join('')
+    + '</div>';
+
+  if (ui.tab === 'chat') {
+    html += '<div class="list">' + conversations.map(c => {
+      const title = ui.editingId === c.id
+        ? `<input class="conv-title-input" id="rename-input" value="${esc(c.title)}" data-action="noop" aria-label="Conversation name">`
+        : `<span class="conv-title">${esc(c.title)}</span>`;
+      return `<div class="conv ${c.id === ui.activeId ? 'active' : ''}" role="button" tabindex="0" data-action="select-conv" data-id="${c.id}">
+        <span class="conv-type ${c.type === 'report' ? 'report' : ''}" title="${c.type === 'report' ? 'Report generation' : 'Data exploration'}">${icon(c.type === 'report' ? 'report' : 'explore')}</span>
+        ${title}
+        ${ui.pending.has(c.id) ? '<span style="color:#9880ff;font-size:10px">●</span>' : ''}
+        <button type="button" class="conv-btn" title="Rename" data-action="rename-conv" data-id="${c.id}">${icon('pencil')}</button>
+        ${conversations.length > 1 ? `<button type="button" class="conv-btn" title="Delete conversation" data-action="delete-conv" data-id="${c.id}">${icon('x')}</button>` : ''}
+      </div>`;
+    }).join('') + '</div>';
+
+    if (ui.choosing) {
+      html += `<div class="chooser" role="group" aria-label="New chat type">
+        <button type="button" class="chooser-option" data-action="new-conv" data-type="exploration">${icon('explore')}
+          <span><span class="chooser-name">Data exploration</span><span class="chooser-desc">Ask questions of the data and save findings as facts.</span></span></button>
+        <button type="button" class="chooser-option" data-action="new-conv" data-type="report">${icon('report', 'report')}
+          <span><span class="chooser-name">Report generation</span><span class="chooser-desc">Combine a report template with saved facts.</span></span></button>
+      </div>`;
+    }
+
+    html += `<button type="button" class="new-chat ${ui.choosing ? 'cancel' : ''}" data-action="toggle-chooser" aria-expanded="${ui.choosing}">
+      ${icon(ui.choosing ? 'x' : 'plus')}<span>${ui.choosing ? 'Cancel' : 'New chat'}</span></button>`;
+  }
+
+  if (ui.tab === 'queries') {
+    html += '<div class="list">' + SAVED_QUERIES.map((q, i) => `
+      <div class="card">
+        <span class="card-title">#${i + 1} ${esc(q.title)}</span>
+        <span class="card-meta">${q.results} results</span>
+        <span class="card-meta">${esc(q.updatedAt)}</span>
+        <span class="card-actions">
+          <button type="button" class="card-action" title="Delete query" data-action="delete-query" data-id="${q.id}">${icon('trash')}</button>
+        </span>
+      </div>`).join('')
+      + (SAVED_QUERIES.length ? '' : '<div class="empty">No saved queries yet.</div>') + '</div>';
+  }
+
+  if (ui.tab === 'facts') {
+    const groups = PROJECTS.map(p => ({ p, facts: FACTS.filter(f => f.projectId === p.id) })).filter(g => g.facts.length);
+
+    html += '<div class="list">' + groups.map(({ p, facts }) => `<div class="group-heading">${esc(p.name)}</div>` + facts.map(f => {
+      return `<div class="card" role="button" tabindex="0" aria-expanded="${ui.expandedFactId === f.id}" data-action="expand-fact" data-id="${f.id}">
+        <span class="card-title"><span class="fact-icon">${icon('fact')}</span>${esc(f.name)}</span>
+        <span class="card-meta">${esc(f.description)}</span>
+        ${ui.expandedFactId === f.id ? `<div class="fact-details">
+          ${f.text ? `<p class="fact-text">${esc(f.text)}</p>` : ''}
+          ${f.statements ? `<pre class="fact-statements"><code>${esc(f.statements)}</code></pre>` : ''}
+        </div>` : ''}
+        <span class="card-actions">
+          <button type="button" class="card-action" title="Delete fact" data-action="delete-fact" data-id="${f.id}">${icon('trash')}</button>
+        </span>
+      </div>`;
+    }).join('')).join('')
+      + (FACTS.length ? '' : '<div class="empty">No facts yet. Facts are saved from data exploration chats.</div>') + '</div>';
+  }
+
+  html += `<p class="sidebar-note"><span class="demo-badge">Mockup: hardcoded data and canned replies. Nothing is saved.</span>${ui.tab === 'facts'
+    ? 'Facts are shared with everyone working on the project.'
+    : 'Chat history and saved queries are stored in your browser\'s local storage.'}</p>`;
+
+  document.getElementById('sidebar').innerHTML = html;
+}
+
+function renderMessages(conv) {
+  const items = conv.messages.map(m => `
+    <div class="message ${m.sender}">
+      <div class="avatar">${m.sender === 'user' ? icon('user') : LOGO}</div>
+      <div class="bubble ${m.sender === 'system' ? 'md' : ''}">${m.sender === 'system' ? markdown(m.text) : esc(m.text)}</div>
+    </div>`);
+
+  if (ui.pending.has(conv.id)) {
+    items.push(`<div class="message system"><div class="avatar">${LOGO}</div><div class="bubble"><span class="dots"><span></span><span></span><span></span></span></div></div>`);
+  }
+
+  if (!items.length) {
+    items.push(conv.type === 'report'
+      ? '<div class="empty-chat"><strong>Report assistant</strong>Pick a template and project, place facts in sections, then generate. You can also ask questions about the template here.</div>'
+      : '<div class="empty-chat"><strong>Data exploration</strong>Ask about locations, flood risk and population. Useful findings can be saved as facts for reports.</div>');
+  }
+
+  return '<div class="messages">' + items.reverse().join('') + '</div>';
+}
+
+function renderInput(conv) {
+  let placeholder = 'Type a message...';
+  if (conv.type === 'report') {
+    placeholder = !conv.report.templateId || conv.report.projectId == null
+      ? 'Describe your report...'
+      : 'Ask the report assistant...';
+  }
+  return `<div class="input-row">
+    <button type="button" class="btn secondary" title="Erase conversation" data-action="erase">${icon('erase')}</button>
+    <textarea id="chat-input" rows="1" placeholder="${placeholder}" aria-label="Message">${esc(conv.draft)}</textarea>
+    <button type="button" class="btn" data-action="send" ${ui.pending.has(conv.id) ? 'disabled' : ''}>Send</button>
+  </div>`;
+}
+
+function renderSetup(conv) {
+  const r = conv.report;
+  const template = templateOf(r);
+  const project = projectOf(r);
+  const projectFacts = FACTS.filter(f => f.projectId === r.projectId);
+  const cov = coverage(r);
+  const loose = unassigned(r);
+
+  const templates = TEMPLATES.map(t => `
+    <div class="template ${r.templateId === t.id ? 'selected' : ''}" role="radio" tabindex="0" aria-checked="${r.templateId === t.id}" data-action="select-template" data-id="${t.id}">
+      <span class="template-name">${esc(t.name)}</span>
+      ${t.regulation ? `<span class="template-regulation" title="${esc(t.regulation)}">${t.regulationUrl
+        ? `<a href="${esc(t.regulationUrl)}" target="_blank" rel="noopener" data-action="noop">${esc(t.regulation)}</a>`
+        : esc(t.regulation)}</span>` : ''}
+    </div>`).join('');
+
+  let step3;
+  if (r.projectId == null) {
+    step3 = '<p class="hint">Pick a project to see its facts.</p>';
+  } else if (!projectFacts.length) {
+    step3 = '<p class="hint">This project has no facts yet. Save some from a data exploration chat.</p>';
+  } else if (!template) {
+    step3 = '<p class="hint">Pick a template to assign facts to its sections.</p>';
+  } else {
+    step3 = '<ol class="sections">' + template.sections.map((s, index) => {
+      const ids = r.sectionFacts[s.name] ?? [];
+      const facts = ids.map(factById).filter(Boolean);
+      const assignable = projectFacts.filter(f => !ids.includes(f.id));
+      const open = ui.expandedSections.has(s.name);
+      const notes = r.sectionNotes[s.name] ?? '';
+      const missing = s.required && !hasContent(r, s);
+
+      return `<li class="section ${open ? 'expanded' : ''} ${missing ? 'missing' : ''}" data-action="toggle-section" data-index="${index}">
+        <button type="button" class="section-header" aria-expanded="${open}" aria-controls="section-details-${index}">
+          <span class="section-chevron">${icon(open ? 'down' : 'right')}</span>
+          <span class="section-heading">
+            <span class="section-name">${esc(s.name)}</span>
+            ${notes.trim() ? `<span class="has-notes" title="Has notes">${icon('note')}</span>` : ''}
+            ${!s.required ? '<span class="optional">optional</span>' : missing ? '<span class="needs-content">needs content</span>' : ''}
+          </span>
+        </button>
+        <div class="section-facts">
+          ${facts.map(f => `<span class="fact-chip" title="${esc(f.description)}"><span class="fact-chip-name">${esc(f.name)}</span>
+            <button type="button" class="chip-remove" aria-label="Remove ${esc(f.name)} from ${esc(s.name)}" data-action="unassign-fact" data-index="${index}" data-id="${f.id}">${icon('x')}</button></span>`).join('')}
+          ${assignable.length ? `<select class="add-fact" aria-label="Add a fact to ${esc(s.name)}" data-action="noop" data-change="assign-fact" data-index="${index}">
+            <option value="" selected>+ Add fact</option>
+            ${assignable.map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('')}
+          </select>` : ''}
+        </div>
+        ${open ? `<div class="section-details" id="section-details-${index}" data-action="noop">
+          <div>
+            <h4 class="details-label">What this section covers</h4>
+            <p class="section-summary">${esc(s.summary)}</p>
+          </div>
+          ${s.example ? `<details class="section-example" data-example="${esc(s.name)}" ${ui.openExamples.has(s.name) ? 'open' : ''}>
+            <summary class="details-label">Example from a previous report <span class="aside">different project, for structure and tone only</span></summary>
+            <div class="md section-example-body">${markdown(s.example)}</div>
+          </details>` : ''}
+          <label class="section-notes">
+            <span class="details-label">Your notes</span>
+            <textarea rows="3" data-notes="${index}" placeholder="Add text, decisions or context for the agent to use in this section…">${esc(notes)}</textarea>
+          </label>
+        </div>` : ''}
+      </li>`;
+    }).join('') + '</ol>';
+  }
+
+  if (loose.length) {
+    step3 += '<div class="unassigned-row"><span class="unassigned-label">Not in a section yet:</span>' + loose.map(f =>
+      `<span class="fact-chip unassigned" title="${esc(f.description)}"><span class="fact-chip-name">${esc(f.name)}</span>
+        <button type="button" class="chip-remove" aria-label="Remove ${esc(f.name)} from the report" data-action="remove-fact-from-report" data-id="${f.id}">${icon('x')}</button></span>`).join('') + '</div>';
+  }
+
+  const missingCount = cov.total - cov.covered;
+  const canGenerate = template && project && !ui.pending.has(conv.id);
+
+  return `<section class="setup" aria-label="Report setup">
+    <header class="pane-header">
+      ${icon('report')}
+      <h2>Report setup</h2>
+      <span class="chip ${template ? '' : 'empty'}">${esc(template?.name ?? 'No template')}</span>
+      <span class="chip ${project ? '' : 'empty'}">${esc(project?.name ?? 'No project')}</span>
+      <span class="chip ${r.factIds.length ? '' : 'empty'}">${r.factIds.length} fact${r.factIds.length === 1 ? '' : 's'}</span>
+    </header>
+    <div class="setup-body">
+      <div class="step">
+        <h3 class="step-title"><span class="step-number">1</span> Template</h3>
+        <div class="template-options" role="radiogroup" aria-label="Report template">${templates}</div>
+      </div>
+      <div class="step">
+        <h3 class="step-title"><span class="step-number">2</span> Project</h3>
+        <select class="project-select" aria-label="Project" data-change="select-project">
+          <option value="" ${r.projectId == null ? 'selected' : ''} disabled>Select a project…</option>
+          ${PROJECTS.map(p => `<option value="${p.id}" ${r.projectId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="step">
+        <h3 class="step-title"><span class="step-number">3</span> Facts by section
+          ${template && cov.total ? `<span class="coverage ${missingCount === 0 ? 'complete' : ''}">${cov.covered} of ${cov.total} required sections covered</span>` : ''}
+        </h3>
+        ${step3}
+      </div>
+      <div class="generate">
+        ${!template || !project
+          ? '<span class="generate-hint">Pick a template and a project to generate.</span>'
+          : missingCount > 0
+            ? `<span class="generate-hint warning">${missingCount} required section${missingCount === 1 ? '' : 's'} still need${missingCount === 1 ? 's' : ''} content. The agent will ask how to handle them.</span>`
+            : ''}
+        <button type="button" class="btn" data-action="generate" ${canGenerate ? '' : 'disabled'}>${icon('report')}<span>${ui.pending.has(conv.id) ? 'Generating…' : 'Generate report'}</span></button>
+      </div>
+    </div>
+  </section>`;
+}
+
+function renderMain() {
+  const conv = active();
+  const main = document.getElementById('main');
+
+  if (!conv) { main.innerHTML = ''; return; }
+
+  main.classList.toggle('report-layout', conv.type === 'report');
+  main.innerHTML = (conv.type === 'report' ? renderSetup(conv) : '')
+    + '<div class="chat-column">'
+    + (conv.type === 'report' ? '<header class="pane-header"><h2>Report assistant</h2></header>' : '')
+    + renderMessages(conv) + renderInput(conv)
+    + '</div>';
+}
+
+function render() {
+  // Keep the setup pane's scroll position across re-renders
+  const scroller = document.querySelector('.setup-body');
+  const scrollTop = scroller?.scrollTop ?? 0;
+
+  renderSidebar();
+  renderMain();
+
+  const nextScroller = document.querySelector('.setup-body');
+  if (nextScroller) nextScroller.scrollTop = scrollTop;
+
+  document.getElementById('theme-toggle').innerHTML = icon(isDark() ? 'sun' : 'moon');
+
+  if (ui.focus) {
+    const el = document.querySelector(ui.focus);
+    if (el) { el.focus(); if (el.select && ui.focus === '#rename-input') el.select(); }
+    ui.focus = null;
+  }
+}
+
+/* ================= Events ================= */
+
+function isDark() {
+  const theme = document.documentElement.dataset.theme;
+  return theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+const actions = {
+  'noop': () => {},
+  'toggle-theme': () => { document.documentElement.dataset.theme = isDark() ? 'light' : 'dark'; },
+  'tab': el => { ui.tab = el.dataset.tab; },
+  'toggle-chooser': () => { ui.choosing = !ui.choosing; },
+  'new-conv': el => { newConversation(el.dataset.type); ui.focus = '#chat-input'; },
+  'select-conv': el => {
+    if (ui.activeId !== el.dataset.id) ui.expandedSections.clear();
+    ui.activeId = el.dataset.id;
+  },
+  'rename-conv': el => { ui.editingId = el.dataset.id; ui.focus = '#rename-input'; },
+  'delete-conv': el => {
+    const conv = conversations.find(c => c.id === el.dataset.id);
+    if (!confirm(`Delete "${conv.title}"? This cannot be undone.`)) return false;
+    conversations = conversations.filter(c => c.id !== conv.id);
+    if (ui.activeId === conv.id) ui.activeId = conversations[0].id;
+  },
+  'delete-query': el => {
+    const q = SAVED_QUERIES.find(x => x.id === el.dataset.id);
+    if (!confirm(`Delete "${q.title}" from saved queries?`)) return false;
+    SAVED_QUERIES = SAVED_QUERIES.filter(x => x !== q);
+  },
+  'expand-fact': el => { const id = Number(el.dataset.id); ui.expandedFactId = ui.expandedFactId === id ? null : id; },
+  'remove-fact-from-report': el => { const conv = active(); if (conv.report) removeFromReport(conv.report, Number(el.dataset.id)); },
+  'delete-fact': el => {
+    const fact = factById(Number(el.dataset.id));
+    if (!confirm(`Delete "${fact.name}"? Reports will no longer be able to use it.`)) return false;
+    FACTS = FACTS.filter(f => f !== fact);
+    conversations.forEach(c => c.report && removeFromReport(c.report, fact.id));
+  },
+  'select-template': el => {
+    const r = active().report;
+    r.templateId = r.templateId === el.dataset.id ? null : el.dataset.id;
+    const names = new Set(templateOf(r)?.sections.map(s => s.name) ?? []);
+    r.sectionFacts = Object.fromEntries(Object.entries(r.sectionFacts).filter(([n]) => names.has(n)));
+    ui.expandedSections.clear();
+  },
+  'toggle-section': el => {
+    const name = templateOf(active().report).sections[Number(el.dataset.index)].name;
+    ui.expandedSections.has(name) ? ui.expandedSections.delete(name) : ui.expandedSections.add(name);
+  },
+  'unassign-fact': el => {
+    const r = active().report;
+    const name = templateOf(r).sections[Number(el.dataset.index)].name;
+    const id = Number(el.dataset.id);
+    r.sectionFacts[name] = (r.sectionFacts[name] ?? []).filter(x => x !== id);
+    if (!Object.values(r.sectionFacts).some(ids => ids.includes(id))) r.factIds = r.factIds.filter(x => x !== id);
+  },
+  'send': () => {
+    const conv = active();
+    const text = conv.draft;
+    conv.draft = '';
+    send(conv, text);
+    ui.focus = '#chat-input';
+    return false;
+  },
+  'generate': () => {
+    const conv = active();
+    const report = conv.report;
+    send(conv, 'Generate the report from the selected template, facts and section notes.', () => buildReport(report));
+    return false;
+  },
+  'erase': () => {
+    const conv = active();
+    if (!conv.messages.length || !confirm('Erase this conversation\'s messages?')) return false;
+    conv.messages = [];
+    conv.title = conv.type === 'report' ? 'New report' : 'New chat';
+  }
+};
+
+document.addEventListener('click', event => {
+  const el = event.target.closest('[data-action]');
+  if (!el) return;
+  if (el.closest('#sidebar') && ui.editingId && el.id !== 'rename-input') finishRename();
+  const result = actions[el.dataset.action]?.(el, event);
+  if (result !== false && el.dataset.action !== 'noop') render();
+});
+
+document.addEventListener('keydown', event => {
+  const el = event.target;
+
+  if (el.id === 'rename-input') {
+    if (event.key === 'Enter') finishRename();
+    if (event.key === 'Escape') { ui.editingId = null; render(); }
+    return;
+  }
+
+  if (el.id === 'chat-input' && event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    actions.send();
+    return;
+  }
+
+  // Keyboard activation for div[role=button|radio] rows
+  if ((event.key === 'Enter' || event.key === ' ') && el.matches('[role="button"][data-action], [role="radio"][data-action]')) {
+    event.preventDefault();
+    el.click();
+  }
+});
+
+document.addEventListener('focusout', event => {
+  if (event.target.id === 'rename-input' && ui.editingId) finishRename();
+});
+
+// <details> toggles don't bubble, so listen in the capture phase
+document.addEventListener('toggle', event => {
+  const name = event.target.dataset?.example;
+  if (name == null) return;
+  event.target.open ? ui.openExamples.add(name) : ui.openExamples.delete(name);
+}, true);
+
+document.addEventListener('input', event => {
+  const el = event.target;
+
+  if (el.id === 'chat-input') {
+    active().draft = el.value;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 180) + 'px';
+    el.style.overflowY = el.scrollHeight > 180 ? 'auto' : 'hidden';
+  }
+
+  if (el.dataset.notes != null) {
+    const r = active().report;
+    const name = templateOf(r).sections[Number(el.dataset.notes)].name;
+    if (el.value) r.sectionNotes[name] = el.value; else delete r.sectionNotes[name];
+
+    // Re-render so coverage, the note icon and the Generate hint stay current,
+    // then put the cursor back where it was
+    const index = el.dataset.notes;
+    const start = el.selectionStart, end = el.selectionEnd;
+    render();
+    const again = document.querySelector(`[data-notes="${index}"]`);
+    if (again) { again.focus(); again.setSelectionRange(start, end); }
+  }
+});
+
+document.addEventListener('change', event => {
+  const el = event.target;
+  const r = active()?.report;
+
+  if (el.dataset.change === 'select-project' && r) {
+    const id = Number(el.value);
+    if (r.projectId !== id) { r.projectId = id; r.factIds = []; r.sectionFacts = {}; }
+    render();
+  }
+
+  if (el.dataset.change === 'assign-fact' && r) {
+    const name = templateOf(r).sections[Number(el.dataset.index)].name;
+    const id = Number(el.value);
+    const ids = r.sectionFacts[name] ?? [];
+    if (!ids.includes(id)) r.sectionFacts[name] = [...ids, id];
+    if (!r.factIds.includes(id)) r.factIds.push(id);
+    render();
+  }
+});
+
+function finishRename() {
+  if (!ui.editingId) return;
+  const input = document.getElementById('rename-input');
+  const conv = conversations.find(c => c.id === ui.editingId);
+  if (conv && input) conv.title = input.value.trim() || (conv.type === 'report' ? 'New report' : 'New chat');
+  ui.editingId = null;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

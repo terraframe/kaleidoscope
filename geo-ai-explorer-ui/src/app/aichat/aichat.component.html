@@ -30,6 +30,13 @@
             (click)="setActiveSidebarTab('queries')">
             Saved Queries
           </button>
+          <button
+            type="button"
+            class="sidebar-tab"
+            [class.active]="activeSidebarTab === 'facts'"
+            (click)="setActiveSidebarTab('facts')">
+            Facts
+          </button>
         </div>
         @if (activeSidebarTab === 'chat') {
           <div class="conversation-tabs">
@@ -39,6 +46,12 @@
                 class="conversation-tab"
                 [class.active]="conversation.id === activeConversationId"
                 (click)="selectConversation(conversation.id)">
+                <fa-icon
+                  class="conversation-type"
+                  [class.report]="conversation.type === 'report'"
+                  [icon]="conversation.type === 'report' ? reportChatIcon : explorationChatIcon"
+                  [title]="conversation.type === 'report' ? 'Report generation' : 'Data exploration'">
+                </fa-icon>
                 @if (editingConversationId !== conversation.id) {
                   <span
                     class="conversation-title"
@@ -82,13 +95,31 @@
               </button>
             }
           </div>
+          @if (choosingChatType) {
+            <div class="chat-type-chooser" role="group" aria-label="New chat type">
+              <button type="button" class="chat-type-option" (click)="newConversation(true, 'exploration')">
+                <fa-icon class="chat-type-icon" [icon]="explorationChatIcon"></fa-icon>
+                <span class="chat-type-text">
+                  <span class="chat-type-name">Data exploration</span>
+                  <span class="chat-type-description">Ask questions of the data and save findings as facts.</span>
+                </span>
+              </button>
+              <button type="button" class="chat-type-option" (click)="newConversation(true, 'report')">
+                <fa-icon class="chat-type-icon report" [icon]="reportChatIcon"></fa-icon>
+                <span class="chat-type-text">
+                  <span class="chat-type-name">Report generation</span>
+                  <span class="chat-type-description">Combine a report template with saved facts.</span>
+                </span>
+              </button>
+            </div>
+          }
           <p-button
             styleClass="new-conversation-button"
-            severity="secondary"
-            pTooltip="New conversation"
-            (onClick)="newConversation()">
-            <fa-icon [icon]="newConversationIcon"></fa-icon>
-            <span>New chat</span>
+            [severity]="choosingChatType ? 'contrast' : 'secondary'"
+            [attr.aria-expanded]="choosingChatType"
+            (onClick)="toggleChatTypeChooser()">
+            <fa-icon [icon]="choosingChatType ? closeConversationIcon : newConversationIcon"></fa-icon>
+            <span>{{ choosingChatType ? 'Cancel' : 'New chat' }}</span>
           </p-button>
         }
         @if (activeSidebarTab === 'queries') {
@@ -155,8 +186,57 @@
             </div>
           }
         }
+        @if (activeSidebarTab === 'facts') {
+          <div class="query-tabs fact-list">
+            @for (group of factGroups; track group.projectId) {
+              <div class="fact-group-heading">{{ group.projectName }}</div>
+              @for (fact of group.facts; track fact.id) {
+                <div
+                  class="query-tab fact-card"
+                  role="button"
+                  tabindex="0"
+                  [attr.aria-expanded]="expandedFactId === fact.id"
+                  (click)="toggleFactDetails(fact)"
+                  (keydown.enter)="toggleFactDetails(fact)">
+                  <span class="query-title fact-title">
+                    <fa-icon class="fact-icon" [icon]="factIcon"></fa-icon>
+                    {{ fact.name }}
+                  </span>
+                  <span class="query-meta">{{ fact.description }}</span>
+                  @if (expandedFactId === fact.id) {
+                    <div class="fact-details">
+                      @if (fact.text) {
+                        <p class="fact-text">{{ fact.text }}</p>
+                      }
+                      @if (fact.statements) {
+                        <pre class="fact-statements"><code>{{ fact.statements }}</code></pre>
+                      }
+                    </div>
+                  }
+                  <span class="query-actions">
+                    <span
+                      class="query-action"
+                      title="Delete fact"
+                      (click)="deleteFact($event, fact)">
+                      <fa-icon [icon]="deleteQueryIcon"></fa-icon>
+                    </span>
+                  </span>
+                </div>
+              }
+            }
+            @if (facts.length === 0) {
+              <div class="empty-query-history">
+                No facts yet. Facts are saved from data exploration chats.
+              </div>
+            }
+          </div>
+        }
         <p class="sidebar-storage-note">
-          Chat history and saved queries are stored in your browser's local storage.
+          @if (activeSidebarTab === 'facts') {
+            Facts are shared with everyone working on the project.
+          } @else {
+            Chat history and saved queries are stored in your browser's local storage.
+          }
         </p>
       </aside>
     }
@@ -169,7 +249,227 @@
       </div>
     }
 
-    <main class="chat-main" (click)="cancelSavedQueryTitleEdit()">
+    <main
+      class="chat-main"
+      [class.report-layout]="isReportChat && !minimized"
+      (click)="cancelSavedQueryTitleEdit()">
+      @if (!minimized && isReportChat && activeReport; as report) {
+        <section class="report-setup" aria-label="Report setup">
+          <header class="report-setup-summary">
+            <fa-icon class="report-setup-icon" [icon]="reportChatIcon"></fa-icon>
+            <h2 class="report-setup-heading">Report setup</h2>
+            <span class="report-chip" [class.empty]="!selectedTemplate">
+              {{ selectedTemplate?.name ?? 'No template' }}
+            </span>
+            <span class="report-chip" [class.empty]="!selectedProject">
+              {{ selectedProject?.name ?? 'No project' }}
+            </span>
+            <span class="report-chip" [class.empty]="report.factIds.length === 0">
+              {{ report.factIds.length }} fact{{ report.factIds.length === 1 ? '' : 's' }}
+            </span>
+          </header>
+
+          <div class="report-setup-body">
+              <div class="report-step">
+                <h3 class="report-step-title"><span class="step-number">1</span> Template</h3>
+                <div class="template-options" role="radiogroup" aria-label="Report template">
+                  @for (template of templates; track template.id) {
+                    <div
+                      class="template-option"
+                      role="radio"
+                      tabindex="0"
+                      [attr.aria-checked]="report.templateId === template.id"
+                      [class.selected]="report.templateId === template.id"
+                      (click)="selectTemplate(template.id)"
+                      (keydown.enter)="selectTemplate(template.id)"
+                      (keydown.space)="selectTemplate(template.id); $event.preventDefault()">
+                      <span class="template-name">{{ template.name }}</span>
+                      @if (template.regulation) {
+                        <span class="template-regulation" [title]="template.regulation">
+                          @if (template.regulationUrl) {
+                            <a [href]="template.regulationUrl" target="_blank" rel="noopener" (click)="$event.stopPropagation()">{{ template.regulation }}</a>
+                          } @else {
+                            {{ template.regulation }}
+                          }
+                        </span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="report-step">
+                <h3 class="report-step-title"><span class="step-number">2</span> Project</h3>
+                <select
+                  class="report-project-select"
+                  aria-label="Project"
+                  [ngModel]="report.projectId"
+                  (ngModelChange)="selectProject($event)">
+                  <option [ngValue]="null" disabled>Select a project…</option>
+                  @for (project of projects; track project.id) {
+                    <option [ngValue]="project.id">{{ project.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="report-step">
+                <h3 class="report-step-title">
+                  <span class="step-number">3</span> Facts by section
+                  @if (selectedTemplate && requiredSectionCoverage.total > 0) {
+                    <span
+                      class="section-coverage"
+                      [class.complete]="requiredSectionCoverage.covered === requiredSectionCoverage.total">
+                      {{ requiredSectionCoverage.covered }} of {{ requiredSectionCoverage.total }} required sections covered
+                    </span>
+                  }
+                </h3>
+                @if (report.projectId == null) {
+                  <p class="report-step-hint">Pick a project to see its facts.</p>
+                } @else if (availableReportFacts.length === 0) {
+                  <p class="report-step-hint">This project has no facts yet. Save some from a data exploration chat.</p>
+                } @else if (!selectedTemplate) {
+                  <p class="report-step-hint">Pick a template to assign facts to its sections.</p>
+                } @else {
+                  <ol class="section-assignments">
+                    @for (section of selectedTemplate.sections; track section.name) {
+                      @let sectionFacts = factsInSection(section);
+                      @let assignable = factsAssignableToSection(section);
+                      <li
+                        class="section-assignment"
+                        [class.expanded]="isSectionExpanded(section)"
+                        [class.missing]="section.required && !sectionHasContent(section)"
+                        (click)="toggleSection(section)">
+                        <!-- The whole card toggles (the click bubbles up from
+                             this button too); the button is the keyboard and
+                             screen-reader handle. -->
+                        <button
+                          type="button"
+                          class="section-assignment-header"
+                          [attr.aria-expanded]="isSectionExpanded(section)"
+                          [attr.aria-controls]="'section-details-' + $index">
+                          <fa-icon
+                            class="section-chevron"
+                            [icon]="isSectionExpanded(section) ? expandIcon : sectionCollapsedIcon">
+                          </fa-icon>
+                          <span class="section-heading-text">
+                            <span class="section-name">{{ section.name }}</span>
+                            @if (sectionNotes(section).trim()) {
+                              <fa-icon class="section-has-notes" [icon]="sectionNotesIcon" title="Has notes"></fa-icon>
+                            }
+                            @if (!section.required) {
+                              <span class="section-optional">optional</span>
+                            } @else if (!sectionHasContent(section)) {
+                              <span class="section-missing">needs content</span>
+                            }
+                          </span>
+                        </button>
+                        <div class="section-facts">
+                          @for (fact of sectionFacts; track fact.id) {
+                            <span class="assigned-fact" [title]="fact.description">
+                              <span class="assigned-fact-name">{{ fact.name }}</span>
+                              <button
+                                type="button"
+                                class="assigned-fact-remove"
+                                [attr.aria-label]="'Remove ' + fact.name + ' from ' + section.name"
+                                (click)="unassignFactFromSection(section, fact); $event.stopPropagation()">
+                                <fa-icon [icon]="closeConversationIcon"></fa-icon>
+                              </button>
+                            </span>
+                          }
+                          @if (assignable.length > 0) {
+                            <select
+                              class="add-fact-select"
+                              [attr.aria-label]="'Add a fact to ' + section.name"
+                              (click)="$event.stopPropagation()"
+                              (change)="onAssignFactSelect($event, section)">
+                              <option value="" selected>+ Add fact</option>
+                              @for (fact of assignable; track fact.id) {
+                                <option [value]="fact.id">{{ fact.name }}</option>
+                              }
+                            </select>
+                          }
+                        </div>
+                        @if (isSectionExpanded(section)) {
+                          <div
+                            class="section-details"
+                            [id]="'section-details-' + $index"
+                            (click)="$event.stopPropagation()">
+                            <div class="section-context">
+                              <h4 class="section-details-label">What this section covers</h4>
+                              <p class="section-summary">{{ section.summary }}</p>
+                            </div>
+                            @if (section.example) {
+                              <details class="section-example">
+                                <summary class="section-details-label">
+                                  Example from a previous report
+                                  <span class="section-example-note">different project, for structure and tone only</span>
+                                </summary>
+                                <div class="markdown-content section-example-body" [innerHTML]="sectionExampleHtml(section)"></div>
+                              </details>
+                            }
+                            <label class="section-notes">
+                              <span class="section-details-label">Your notes</span>
+                              <textarea
+                                rows="3"
+                                placeholder="Add text, decisions or context for the agent to use in this section…"
+                                [ngModel]="sectionNotes(section)"
+                                (ngModelChange)="setSectionNotes(section, $event)">
+                              </textarea>
+                            </label>
+                          </div>
+                        }
+                      </li>
+                    }
+                  </ol>
+                }
+                @if (unassignedFacts.length > 0) {
+                  <div class="unassigned-facts">
+                    <span class="unassigned-label">Not in a section yet:</span>
+                    @for (fact of unassignedFacts; track fact.id) {
+                      <span class="assigned-fact unassigned" [title]="fact.description">
+                        <span class="assigned-fact-name">{{ fact.name }}</span>
+                        <button
+                          type="button"
+                          class="assigned-fact-remove"
+                          [attr.aria-label]="'Remove ' + fact.name + ' from the report'"
+                          (click)="removeFactFromReport(fact)">
+                          <fa-icon [icon]="closeConversationIcon"></fa-icon>
+                        </button>
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+
+            <div class="report-generate">
+              @if (!selectedTemplate || !selectedProject) {
+                <span class="report-generate-hint">Pick a template and a project to generate.</span>
+              } @else if (requiredSectionCoverage.covered < requiredSectionCoverage.total) {
+                <span class="report-generate-hint warning">
+                  {{ requiredSectionCoverage.total - requiredSectionCoverage.covered }} required
+                  section{{ requiredSectionCoverage.total - requiredSectionCoverage.covered === 1 ? '' : 's' }}
+                  still need{{ requiredSectionCoverage.total - requiredSectionCoverage.covered === 1 ? 's' : '' }} content.
+                  The agent will ask how to handle them.
+                </span>
+              }
+              <p-button
+                styleClass="report-generate-button"
+                [disabled]="!canGenerateReport"
+                [loading]="loading"
+                (onClick)="generateReport()">
+                <fa-icon [icon]="reportChatIcon"></fa-icon>
+                <span>Generate report</span>
+              </p-button>
+            </div>
+          </div>
+        </section>
+      }
+
+      <div class="chat-column">
+      @if (!minimized && isReportChat) {
+        <header class="chat-column-header">Report assistant</header>
+      }
+
       @if (!minimized) {
         <div class="messages">
           <ng-container>
@@ -258,7 +558,7 @@
           #messageInput
           [(ngModel)]="message"
           rows="1"
-          placeholder="Type a message..."
+          [placeholder]="messagePlaceholder"
           (input)="resizeMessageInput(messageInput)"
           (keydown)="onMessageKeydown($event)">
         </textarea>
@@ -269,6 +569,7 @@
           (onClick)="sendMessage()">
           Send
         </p-button>
+      </div>
       </div>
     </main>
   </div>
