@@ -19,4 +19,6 @@ public interface CrudService<T, K>
 
   Optional<T> findById(K id);
 
+  T getOrThrow(K id);
+
 }

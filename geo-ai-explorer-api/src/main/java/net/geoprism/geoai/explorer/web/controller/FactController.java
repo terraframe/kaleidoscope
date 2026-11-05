@@ -13,37 +13,39 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+import net.geoprism.geoai.explorer.core.dto.FactDTO;
 import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.service.FactService;
 
 @RestController
 @Validated
-@RequestMapping("/api/snippet")
+@RequestMapping("/api/fact")
 public class FactController
 {
   @Autowired
   private FactService service;
 
-  @PostMapping("/snippets")
-  public Fact save(@RequestBody Fact snippet)
+  @PostMapping("/facts")
+  public FactDTO save(@Valid @RequestBody FactDTO fact)
   {
-    return service.save(snippet);
+    return service.save(fact);
   }
 
-  @GetMapping("/snippets")
-  public List<Fact> fetchList()
+  @GetMapping("/facts/{projectId}")
+  public List<FactDTO> fetchList(@PathVariable("projectId") Long projectId)
   {
-    return service.fetchList();
+    return service.fetchListByProject(projectId).stream().map(service::toDTO).toList();
   }
 
-  @PutMapping("/snippets/{id}")
-  public Fact update(@RequestBody Fact snippet, @PathVariable("id") Long id)
+  @PutMapping("/facts/{id}")
+  public Fact update(@RequestBody Fact fact, @PathVariable("id") Long id)
   {
-    return service.update(snippet, id);
+    return service.update(fact, id);
   }
 
   // Delete operation
-  @DeleteMapping("/snippets/{id}")
+  @DeleteMapping("/facts/{id}")
   public String deleteById(@PathVariable("id") Long id)
   {
     service.deleteById(id);
