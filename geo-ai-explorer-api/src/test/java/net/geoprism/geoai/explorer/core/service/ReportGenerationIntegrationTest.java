@@ -1,5 +1,6 @@
 package net.geoprism.geoai.explorer.core.service;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
@@ -30,13 +31,13 @@ public class ReportGenerationIntegrationTest extends MockDataTest
 {
 
   @Autowired
-  private BedrockService   service;
+  private BedrockService service;
 
   @MockitoBean
-  private ProjectService   projectService;
+  private ProjectService projectService;
 
   @MockitoBean
-  private FactService discoveryService;
+  private FactService    discoveryService;
 
   @BeforeEach
   public void setUp()
@@ -128,13 +129,16 @@ public class ReportGenerationIntegrationTest extends MockDataTest
   public void testFactSuggestions() throws InterruptedException, ExecutionException, TimeoutException
   {
     String input = """
-            Generate a report using template 'PLAN_EVAL' for project 1.  What facts are most appropriate for National Economic Development (NED) Analysis section?""";
-    
+        Generate a report using template 'PLAN_EVAL' for project 1.  What facts are most appropriate for National Economic Development (NED) Analysis section?""";
+
     String sessionId = UUID.randomUUID().toString();
-    
+
     String response = service.report(sessionId, input);
     
     System.out.println(response);
+
+    assertTrue(response.toLowerCase().contains("**1"), "Failed assumption with response" + response);
+    assertTrue(response.toLowerCase().contains("**2"), "Failed assumption with response" + response);
   }
-  
+
 }

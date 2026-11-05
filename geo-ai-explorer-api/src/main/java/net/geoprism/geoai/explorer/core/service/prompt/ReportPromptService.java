@@ -27,7 +27,7 @@ public class ReportPromptService
         Once all the sections have data, generate a report in markdown based on the template and facts selected.
 
         You have access to multiple tools:
-        - list_templates: List of the report template by id and names in the system
+        - list_templates: List of the report templates by id and name
         - get_template: Get the full details of a report template for a given template id
         - list_projects: List of the projects in the system
         - list_facts: List of report facts (id, name, and description) for a given project id.
