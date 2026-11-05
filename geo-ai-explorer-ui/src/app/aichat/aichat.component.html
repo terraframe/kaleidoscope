@@ -1,12 +1,63 @@
 <div class="aichat-root">
   <p-confirmDialog appendTo="body"></p-confirmDialog>
 
+  <p-dialog
+    header="Save Fact"
+    [(visible)]="visible"
+    [modal]="true"
+    [draggable]="false"
+    [resizable]="false"
+    appendTo="body"
+    styleClass="save-fact-dialog"
+  >
+    <form #factForm="ngForm">
+      @if (fact != null) {
+        <div class="save-fact-form">
+          <label for="save-fact-project">Project</label>
+          <select id="save-fact-project" [(ngModel)]="fact.projectId" name="projectId">
+            <option [ngValue]="null">Create new Project...</option>
+            @for (project of projects; track project.id) {
+              <option [ngValue]="project.id">{{ project.name }}</option>
+            }
+          </select>
+          @if (fact.projectId == null) {
+            <label for="save-fact-project-name">Project Name</label>
+            <input
+              id="save-fact-project-name"
+              type="text"
+              [(ngModel)]="fact.projectName"
+              name="projectName"
+              autocomplete="off"
+              required
+            />
+          }
+          <label for="save-fact-name">Name</label>
+          <input id="save-fact-name" type="text" [(ngModel)]="fact.name" name="name" autocomplete="off" required />
+          <label for="save-fact-description">Description</label>
+          <textarea
+            id="save-fact-description"
+            rows="4"
+            [(ngModel)]="fact.description"
+            name="description"
+            autocomplete="off"
+            required
+          ></textarea>
+        </div>
+      }
+    </form>
+    <ng-template #footer>
+      <p-button severity="secondary" label="Cancel" (onClick)="visible = false"> </p-button>
+
+      <p-button label="Save" [disabled]="!factForm.valid" (onClick)="saveFact()"> </p-button>
+    </ng-template>
+  </p-dialog>
+
   <div
     #chatContainer
     class="chat-container"
     [class.minimized]="minimized"
-    [style.--chat-sidebar-width.px]="sidebarWidthPx">
-
+    [style.--chat-sidebar-width.px]="sidebarWidthPx"
+  >
     @if (mapLoading) {
       <div class="spinner-overlay">
         <p-progress-spinner ariaLabel="loading" />
@@ -20,14 +71,16 @@
             type="button"
             class="sidebar-tab"
             [class.active]="activeSidebarTab === 'chat'"
-            (click)="setActiveSidebarTab('chat')">
+            (click)="setActiveSidebarTab('chat')"
+          >
             Chat History
           </button>
           <button
             type="button"
             class="sidebar-tab"
             [class.active]="activeSidebarTab === 'queries'"
-            (click)="setActiveSidebarTab('queries')">
+            (click)="setActiveSidebarTab('queries')"
+          >
             Saved Queries
           </button>
         </div>
@@ -38,12 +91,14 @@
                 type="button"
                 class="conversation-tab"
                 [class.active]="conversation.id === activeConversationId"
-                (click)="selectConversation(conversation.id)">
+                (click)="selectConversation(conversation.id)"
+              >
                 @if (editingConversationId !== conversation.id) {
                   <span
                     class="conversation-title"
                     title="Double-click to rename"
-                    (dblclick)="startEditingConversationTitle($event, conversation)">
+                    (dblclick)="startEditingConversationTitle($event, conversation)"
+                  >
                     {{ conversation.title }}
                   </span>
                 }
@@ -56,13 +111,15 @@
                     (keydown.enter)="saveConversationTitle($event)"
                     (keydown.escape)="cancelConversationTitleEdit($event)"
                     (blur)="saveConversationTitle($event)"
-                    autofocus />
+                    autofocus
+                  />
                 }
                 @if (editingConversationId !== conversation.id) {
                   <span
                     class="conversation-edit"
                     [title]="'Edit conversation name'"
-                    (click)="startEditingConversationTitle($event, conversation)">
+                    (click)="startEditingConversationTitle($event, conversation)"
+                  >
                     <fa-icon [icon]="edit"></fa-icon>
                   </span>
                 }
@@ -73,9 +130,12 @@
                   <span
                     class="conversation-close"
                     [title]="editingConversationId === conversation.id ? 'Cancel rename' : 'Delete conversation'"
-            (click)="editingConversationId === conversation.id
-              ? cancelConversationTitleEdit($event)
-              : deleteConversation($event, conversation.id)">
+                    (click)="
+                      editingConversationId === conversation.id
+                        ? cancelConversationTitleEdit($event)
+                        : deleteConversation($event, conversation.id)
+                    "
+                  >
                     <fa-icon [icon]="closeConversationIcon"></fa-icon>
                   </span>
                 }
@@ -86,7 +146,8 @@
             styleClass="new-conversation-button"
             severity="secondary"
             pTooltip="New conversation"
-            (onClick)="newConversation()">
+            (onClick)="newConversation()"
+          >
             <fa-icon [icon]="newConversationIcon"></fa-icon>
             <span>New chat</span>
           </p-button>
@@ -100,11 +161,10 @@
                   class="query-tab"
                   [id]="savedQueryElementId(query.id)"
                   [class.highlight]="highlightSavedQueryId === query.id"
-                  (click)="openSavedQueryChat(query)">
+                  (click)="openSavedQueryChat(query)"
+                >
                   @if (editingSavedQueryId !== query.id) {
-                    <span
-                      class="query-title"
-                      >
+                    <span class="query-title">
                       #{{ queryIndex + 1 }}
                       {{ query.title }}
                     </span>
@@ -117,7 +177,8 @@
                       (click)="$event.stopPropagation()"
                       (keydown.enter)="saveSavedQueryTitle($event, query)"
                       (keydown.escape)="cancelSavedQueryTitleEdit($event)"
-                      autocomplete="off" />
+                      autocomplete="off"
+                    />
                   }
                   <span class="query-meta">
                     {{ formatQueryMeta(query) }}
@@ -129,44 +190,35 @@
                     <span
                       class="query-action"
                       title="View on Map"
-                      (click)="viewCachedQuery(query); $event.stopPropagation()">
+                      (click)="viewCachedQuery(query); $event.stopPropagation()"
+                    >
                       <fa-icon [icon]="viewQueryIcon"></fa-icon>
                     </span>
                     <span
                       class="query-action"
                       title="Rename query"
-                      (click)="startEditingSavedQueryTitle($event, query)">
+                      (click)="startEditingSavedQueryTitle($event, query)"
+                    >
                       <fa-icon [icon]="edit"></fa-icon>
                     </span>
-                    <span
-                      class="query-action"
-                      title="Delete query"
-                      (click)="deleteCachedQuery($event, query)">
+                    <span class="query-action" title="Delete query" (click)="deleteCachedQuery($event, query)">
                       <fa-icon [icon]="deleteQueryIcon"></fa-icon>
                     </span>
                   </span>
                 </button>
               }
               @if (savedQueries.length === 0) {
-                <div class="empty-query-history">
-                  No saved queries yet.
-                </div>
+                <div class="empty-query-history">No saved queries yet.</div>
               }
             </div>
           }
         }
-        <p class="sidebar-storage-note">
-          Chat history and saved queries are stored in your browser's local storage.
-        </p>
+        <p class="sidebar-storage-note">Chat history and saved queries are stored in your browser's local storage.</p>
       </aside>
     }
 
     @if (!minimized) {
-      <div
-        class="sidebar-resize-handle"
-        title="Resize sidebar"
-        (mousedown)="startSidebarResize($event)">
-      </div>
+      <div class="sidebar-resize-handle" title="Resize sidebar" (mousedown)="startSidebarResize($event)"></div>
     }
 
     <main class="chat-main" (click)="cancelSavedQueryTitleEdit()">
@@ -177,58 +229,61 @@
               <div
                 class="message"
                 [id]="chatMessageElementId(msg.id)"
-          [ngClass]="{
-            'user': msg.sender === 'user',
-            'system': msg.sender === 'system',
-            'highlight': highlightChatMessageId === msg.id
-          }">
+                [ngClass]="{
+                  user: msg.sender === 'user',
+                  system: msg.sender === 'system',
+                  highlight: highlightChatMessageId === msg.id,
+                }"
+              >
                 <div class="sender-icon">
                   @if (msg.sender === 'user') {
-                    <fa-icon
-                      class="icon"
-                      [icon]="messageUserIcon">
-                    </fa-icon>
+                    <fa-icon class="icon" [icon]="messageUserIcon"> </fa-icon>
                   }
                   @if (msg.sender === 'system') {
-                    <img
-                      src="assets/system-logo.svg">
-                    }
-                  </div>
-                  <label [for]="msg.id" class="vertical-layout">
-                    @if (msg.loading) {
-                      <div class="dot-pulse-container">
-                        <div class="dot-pulse"></div>
-                      </div>
-                    }
-                    @if (!msg.loading) {
-                      @if (msg.reasoning) {
-                        <div
-                          class="reasoning-toggle"
-                          pTooltip
-                          [pTooltip]="msg.reasoning"
-                          tooltipPosition="top"
-                          tooltipStyleClass="reasoning-tooltip">
+                    <img src="assets/system-logo.svg" />
+                  }
+                </div>
+                <label [for]="msg.id" class="vertical-layout">
+                  @if (msg.loading) {
+                    <div class="dot-pulse-container">
+                      <div class="dot-pulse"></div>
+                    </div>
+                  }
+                  @if (!msg.loading) {
+                    @if (msg.reasoning) {
+                      <div
+                        class="reasoning-toggle"
+                        pTooltip
+                        [pTooltip]="msg.reasoning"
+                        tooltipPosition="top"
+                        tooltipStyleClass="reasoning-tooltip"
+                      >
                         <fa-icon [icon]="reasoningIcon"></fa-icon>
                         <span>Reasoning</span>
                       </div>
                     }
                     <span class="markdown-content" [innerHTML]="msg.renderedHtml"></span>
-                    @if (msg.mappable) {
-                      <div class="action mappable-actions">
+                    <div class="action mappable-actions">
+                      @if (msg.sender === 'system' && msg.statements) {
+                        <p-button severity="secondary" (onClick)="createFact($event, msg)">
+                          <fa-icon [icon]="saveQueryIcon"></fa-icon>
+                          <span>Save as Fact</span>
+                        </p-button>
+                      }
+
+                      @if (msg.mappable) {
                         <p-button (onClick)="mapIt(msg)">
                           <fa-icon [icon]="mapIcon"></fa-icon>
                           View on Map
                         </p-button>
                         @if (msg.savedQueryIndex; as savedIndex) {
-                          <p-button
-                            severity="secondary"
-                            (onClick)="saveOrScrollQuery($event, msg)">
+                          <p-button severity="secondary" (onClick)="saveOrScrollQuery($event, msg)">
                             <fa-icon [icon]="saveQueryIcon"></fa-icon>
                             <span>Saved Query #{{ savedIndex }}</span>
                           </p-button>
                         }
-                      </div>
-                    }
+                      }
+                    </div>
                     @if (msg.ambiguous && last) {
                       <div class="action ambiguous">
                         <br />
@@ -247,10 +302,7 @@
       }
 
       <div class="input-container">
-        <p-button
-          severity="secondary"
-          pTooltip="Erase conversation"
-          (onClick)="clear()">
+        <p-button severity="secondary" pTooltip="Erase conversation" (onClick)="clear()">
           <fa-icon [icon]="icon"></fa-icon>
         </p-button>
 
@@ -260,17 +312,12 @@
           rows="1"
           placeholder="Type a message..."
           (input)="resizeMessageInput(messageInput)"
-          (keydown)="onMessageKeydown($event)">
+          (keydown)="onMessageKeydown($event)"
+        >
         </textarea>
 
-        <p-button
-          class="btn btn-primary"
-          [disabled]="loading"
-          (onClick)="sendMessage()">
-          Send
-        </p-button>
+        <p-button class="btn btn-primary" [disabled]="loading" (onClick)="sendMessage()"> Send </p-button>
       </div>
     </main>
   </div>
-
 </div>

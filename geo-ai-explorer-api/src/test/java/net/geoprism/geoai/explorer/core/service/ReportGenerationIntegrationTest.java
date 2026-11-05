@@ -120,8 +120,8 @@ public class ReportGenerationIntegrationTest extends MockDataTest
   public void testReportGeneration() throws InterruptedException, ExecutionException, TimeoutException
   {
     String input = """
-            Generate a report using template 'PLAN_EVAL' for project 1.  Use discoveries 1 and 2
-            in the National Economic Development (NED) Analysis section. Use discoveries
+            Generate a report using template 'PLAN_EVAL' for project 1.  Use facts 1 and 2
+            in the National Economic Development (NED) Analysis section. Use facts
             3 and 4 in the Regional Economic Development (RED) Analysis section.
         """;
 

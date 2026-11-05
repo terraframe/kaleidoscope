@@ -7,7 +7,6 @@ import { ChatMessage, JobStartResponse, LocationPage, ServerChatResponse } from 
 import { MockUtil } from '../mock-util';
 import { environment } from '../../environments/environment';
 import { apiBase } from './url.util';
-import { GeoObject } from '../models/geoobject.model';
 import { ExplorerSessionStateService } from './explorer-session-state.service';
 import { pollJob } from './job-polling.util';
 
@@ -15,7 +14,6 @@ import { pollJob } from './job-polling.util';
   providedIn: 'root',
 })
 export class ChatService {
-
   /*
    * chat/prompt and chat/get-locations both invoke a Bedrock AgentCore
    * harness on the server that can take up to several minutes to respond
@@ -32,9 +30,7 @@ export class ChatService {
   constructor(
     private http: HttpClient,
     private explorerSessionState: ExplorerSessionStateService
-  ) {
-  }
-
+  ) {}
 
   /**
    * @param onJobStarted Invoked synchronously (before the job completes)
@@ -44,18 +40,18 @@ export class ChatService {
    * before the job settles, it can resume polling (or fail the message
    * cleanly) on the next boot via {@link resumePrompt}.
    */
-  sendMessage(sessionId: string, message: ChatMessage, onJobStarted?: (statusUrl: string) => void): Promise<ChatMessage> {
-
-    if (environment.mockRequests)
-    {
+  sendMessage(
+    sessionId: string,
+    message: ChatMessage,
+    onJobStarted?: (statusUrl: string) => void
+  ): Promise<ChatMessage> {
+    if (environment.mockRequests) {
       return new Promise<ChatMessage>((resolve) => {
         setTimeout(() => {
           resolve(MockUtil.message);
         }, 500); // Simulating network delay
       });
-    }
-    else
-    {
+    } else {
       // Sent in the body so long prompts aren't limited by URL length
       const params = { sessionId: sessionId, prompt: message.text };
 
@@ -65,7 +61,7 @@ export class ChatService {
           onJobStarted?.(statusUrl);
           return pollJob<ServerChatResponse>(this.http, statusUrl);
         })
-        .then(response => this.toChatMessage(response));
+        .then((response) => this.toChatMessage(response));
     }
   }
 
@@ -79,7 +75,7 @@ export class ChatService {
    * server no longer recognizes the job).
    */
   resumePrompt(statusUrl: string): Promise<ChatMessage> {
-    return pollJob<ServerChatResponse>(this.http, statusUrl).then(response => this.toChatMessage(response));
+    return pollJob<ServerChatResponse>(this.http, statusUrl).then((response) => this.toChatMessage(response));
   }
 
   private toChatMessage(response: ServerChatResponse): ChatMessage {
@@ -91,7 +87,8 @@ export class ChatService {
       ambiguous: response.ambiguous,
       purpose: 'standard',
       location: response.location,
-      reasoning: response.reasoning
+      reasoning: response.reasoning,
+      statements: response.statements,
     };
   }
 
@@ -103,39 +100,52 @@ export class ChatService {
       return Promise.resolve(cachedPages);
     }
 
-    if (environment.mockRequests)
-    {
+    if (environment.mockRequests) {
       return new Promise<LocationPage[]>((resolve) => {
         setTimeout(() => {
           resolve([MockUtil.locations]);
         }, 500); // Simulating network delay
-      }).then(pages => {
+      }).then((pages) => {
         this.explorerSessionState.cachePages(pages, 'chat-mapit', cacheId);
         return pages;
       });
-    }
-    else
-    {
+    } else {
       const params = {
-        messages: messages.map(message => ({
+        messages: messages.map((message) => ({
           type: message.sender === 'user' ? 'USER' : 'AI',
-          content: message.text
+          content: message.text,
         })),
         limit,
-        offset
-      }
+        offset,
+      };
 
       return firstValueFrom(this.http.post<JobStartResponse>(apiBase() + 'api/chat/get-locations/start', params))
         .then(({ jobId }) => pollJob<LocationPage[]>(this.http, apiBase() + 'api/chat/get-locations/status/' + jobId))
-        .then(pages => {
+        .then((pages) => {
           this.explorerSessionState.cachePages(pages, 'chat-mapit', cacheId);
           return pages;
         });
     }
   }
 
-  getPage(statement: string, type: string | null, offset: number, limit: number, excludedTypes: string[] = [], sortField?: string | null, sortDirection?: 'asc' | 'desc' | null): Promise<LocationPage> {
-    const cacheId = this.explorerSessionState.getOrCreatePageRequestId(statement, type, offset, limit, excludedTypes, sortField, sortDirection);
+  getPage(
+    statement: string,
+    type: string | null,
+    offset: number,
+    limit: number,
+    excludedTypes: string[] = [],
+    sortField?: string | null,
+    sortDirection?: 'asc' | 'desc' | null
+  ): Promise<LocationPage> {
+    const cacheId = this.explorerSessionState.getOrCreatePageRequestId(
+      statement,
+      type,
+      offset,
+      limit,
+      excludedTypes,
+      sortField,
+      sortDirection
+    );
     const cachedPages = this.explorerSessionState.getPages(cacheId);
     const cachedPage = cachedPages?.[0];
 
@@ -143,19 +153,16 @@ export class ChatService {
       return Promise.resolve(cachedPage);
     }
 
-    if (environment.mockRequests)
-    {
+    if (environment.mockRequests) {
       return new Promise<LocationPage>((resolve) => {
         setTimeout(() => {
           resolve(MockUtil.locations);
         }, 500); // Simulating network delay
-      }).then(page => {
+      }).then((page) => {
         this.explorerSessionState.cachePages([page], 'page-query', cacheId);
         return page;
       });
-    }
-    else
-    {
+    } else {
       // // // Uncomment below to make a real HTTP request
       const params = {
         statement,
@@ -164,18 +171,23 @@ export class ChatService {
         offset,
         excludedTypes,
         sortField,
-        sortDirection
-      }
+        sortDirection,
+      };
 
-      return firstValueFrom(this.http.post<LocationPage>(apiBase() + 'api/chat/get-page', params))
-        .then(page => {
-          this.explorerSessionState.cachePages([page], 'page-query', cacheId);
-          return page;
+      return firstValueFrom(this.http.post<LocationPage>(apiBase() + 'api/chat/get-page', params)).then((page) => {
+        this.explorerSessionState.cachePages([page], 'page-query', cacheId);
+        return page;
       });
     }
   }
 
-  exportPage(statement: string, type: string | null, excludedTypes: string[] = [], sortField?: string | null, sortDirection?: 'asc' | 'desc' | null): Promise<Blob> {
+  exportPage(
+    statement: string,
+    type: string | null,
+    excludedTypes: string[] = [],
+    sortField?: string | null,
+    sortDirection?: 'asc' | 'desc' | null
+  ): Promise<Blob> {
     const params = {
       statement,
       type,
@@ -183,12 +195,13 @@ export class ChatService {
       offset: 0,
       excludedTypes,
       sortField,
-      sortDirection
+      sortDirection,
     };
 
-    return firstValueFrom(this.http.post(apiBase() + 'api/chat/export-page', params, {
-      responseType: 'blob'
-    }));
+    return firstValueFrom(
+      this.http.post(apiBase() + 'api/chat/export-page', params, {
+        responseType: 'blob',
+      })
+    );
   }
-
 }

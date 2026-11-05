@@ -1,11 +1,16 @@
 package net.geoprism.geoai.explorer.core.entity;
 
+import java.time.Instant;
+
+import org.hibernate.annotations.CreationTimestamp;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -34,10 +39,17 @@ public class Fact
   private String  name;
 
   @Column(name = "description", nullable = false, unique = false)
+  @Lob
   private String  description;
 
+  @Lob
   private String  text;
 
+  @Lob
   private String  statements;
+
+  @CreationTimestamp
+  @Column(name = "created_date", nullable = false, updatable = false)
+  private Instant createdDate;
 
 }

@@ -18,19 +18,14 @@ import {
   faMapLocation,
   faFloppyDisk,
   faTrash,
-  faBrain
+  faBrain,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { ChatService } from '../service/chat-service.service';
-import { initialState, parseText } from '../state/chat.state';
-import { ChatMessage } from '../models/chat.model';
+import { parseText } from '../state/chat.state';
+import { ChatMessage, Fact, Project } from '../models/chat.model';
 import { ErrorService } from '../service/error-service.service';
-import {
-  ExplorerActions,
-  getWorkflowData,
-  getWorkflowStep,
-  WorkflowStep
-} from '../state/explorer.state';
+import { ExplorerActions, getWorkflowData, getWorkflowStep, WorkflowStep } from '../state/explorer.state';
 import { ExplorerService } from '../service/explorer.service';
 import { GeoObject } from '../models/geoobject.model';
 import { CachedExplorerPages, ExplorerSessionStateService } from '../service/explorer-session-state.service';
@@ -39,6 +34,9 @@ import { marked } from 'marked';
 
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
+import { FactService } from '../service/fact.service';
+import { ProjectService } from '../service/project.service';
 
 interface ChatConversation {
   id: string;
@@ -64,11 +62,12 @@ interface RenderedChatMessage extends ChatMessage {
     ProgressSpinnerModule,
     FontAwesomeModule,
     TooltipModule,
-    ConfirmDialogModule
+    ConfirmDialogModule,
+    DialogModule,
   ],
-  providers: [ConfirmationService],
+  providers: [ConfirmationService, FactService],
   templateUrl: './aichat.component.html',
-  styleUrl: './aichat.component.scss'
+  styleUrl: './aichat.component.scss',
 })
 export class AichatComponent {
   private readonly STORAGE_KEY = 'aichat.conversations.v1';
@@ -98,6 +97,11 @@ export class AichatComponent {
   savedQueries$: Observable<CachedExplorerPages[]>;
   onWorkflowStepChange: Subscription;
   onSavedQueriesChange: Subscription;
+
+  // Current selected fact
+  fact: Fact | null = null;
+  visible: boolean = false;
+  projects: Project[] = [];
 
   public conversations: ChatConversation[] = [];
   public activeConversationId: string | null = null;
@@ -141,11 +145,13 @@ export class AichatComponent {
     private errorService: ErrorService,
     private messageService: MessageService,
     private confirmationService: ConfirmationService,
-    private explorerSessionState: ExplorerSessionStateService
+    private explorerSessionState: ExplorerSessionStateService,
+    private factService: FactService,
+    private projectService: ProjectService
   ) {
     this.savedQueries$ = this.explorerSessionState.savedQueries$;
     this.activeSidebarTab = this.loadActiveSidebarTab();
-    this.onSavedQueriesChange = this.savedQueries$.subscribe(savedQueries => {
+    this.onSavedQueriesChange = this.savedQueries$.subscribe((savedQueries) => {
       this.savedQueryIndexById = new Map(savedQueries.map((query, index) => [query.id, index + 1]));
       this.refreshRenderedMessages();
     });
@@ -153,10 +159,7 @@ export class AichatComponent {
     this.loadConversations();
     this.reconcilePendingJobs();
 
-    this.onWorkflowStepChange = combineLatest([
-      this.workflowStep$,
-      this.workflowData$
-    ]).subscribe(([step, data]) => {
+    this.onWorkflowStepChange = combineLatest([this.workflowStep$, this.workflowData$]).subscribe(([step, data]) => {
       if (step === WorkflowStep.FullScreenChat && data != null) {
         const go = data as GeoObject;
         const conversation = this.activeConversation;
@@ -174,6 +177,8 @@ export class AichatComponent {
     // Handle the case where a location link's hash is already on the URL
     // when this component is (re)constructed, e.g. a hard refresh.
     this.handleLocationHashNavigation();
+
+    this.projectService.getAll().then((projects) => (this.projects = projects));
   }
 
   ngOnDestroy(): void {
@@ -241,7 +246,7 @@ export class AichatComponent {
   }
 
   get activeConversation(): ChatConversation | undefined {
-    return this.conversations.find(c => c.id === this.activeConversationId);
+    return this.conversations.find((c) => c.id === this.activeConversationId);
   }
 
   get message(): string {
@@ -292,18 +297,18 @@ export class AichatComponent {
         return;
       }
 
-      this.conversations = conversations.map(c => ({
+      this.conversations = conversations.map((c) => ({
         id: c.id ?? uuidv4(),
         title: c.title ?? 'New chat',
         sessionId: c.sessionId ?? uuidv4(),
-        messages: Array.isArray(c.messages) ? c.messages.map(message => parseText(message)) : [],
+        messages: Array.isArray(c.messages) ? c.messages.map((message) => parseText(message)) : [],
         draft: c.draft ?? '',
         loading: false,
-        createdAt: c.createdAt ?? Date.now()
+        createdAt: c.createdAt ?? Date.now(),
       }));
 
-      const hasRealChatHistory = this.conversations.some(c =>
-        c.messages.some(m => m.purpose === 'standard') || c.draft.trim().length > 0
+      const hasRealChatHistory = this.conversations.some(
+        (c) => c.messages.some((m) => m.purpose === 'standard') || c.draft.trim().length > 0
       );
 
       if (!hasRealChatHistory) {
@@ -311,11 +316,9 @@ export class AichatComponent {
         return;
       }
 
-      const activeStillExists = this.conversations.some(c => c.id === rawActiveConversationId);
+      const activeStillExists = this.conversations.some((c) => c.id === rawActiveConversationId);
 
-      this.activeConversationId = activeStillExists
-        ? rawActiveConversationId
-        : this.conversations[0].id;
+      this.activeConversationId = activeStillExists ? rawActiveConversationId : this.conversations[0].id;
 
       this.refreshRenderedMessages();
       this.saveConversations();
@@ -345,7 +348,7 @@ export class AichatComponent {
 
     const rendered = marked.parse(source, {
       breaks: true,
-      gfm: true
+      gfm: true,
     }) as string;
 
     this.markdownCache.set(source, rendered);
@@ -357,7 +360,7 @@ export class AichatComponent {
     const conversation = this.activeConversation;
 
     this.renderedMessages = conversation
-      ? [...conversation.messages].reverse().map(message => this.buildRenderedMessage(conversation, message))
+      ? [...conversation.messages].reverse().map((message) => this.buildRenderedMessage(conversation, message))
       : [];
   }
 
@@ -382,9 +385,7 @@ export class AichatComponent {
     return {
       ...message,
       renderedHtml: message.sender === 'system' ? this.renderMarkdown(parsedText) : parsedText,
-      savedQueryIndex: message.mappable
-        ? this.getSavedQueryIndexForConversation(conversation, message)
-        : null
+      savedQueryIndex: message.mappable ? this.getSavedQueryIndexForConversation(conversation, message) : null,
     };
   }
 
@@ -398,7 +399,7 @@ export class AichatComponent {
       messages: [],
       draft: '',
       loading: false,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
 
     this.conversations.unshift(conversation);
@@ -420,7 +421,7 @@ export class AichatComponent {
       messages: this.createDefaultMessages(),
       draft: '',
       loading: false,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
 
     this.conversations.unshift(conversation);
@@ -446,9 +447,7 @@ export class AichatComponent {
   }
 
   private loadActiveSidebarTab(): 'chat' | 'queries' {
-    return localStorage.getItem(this.ACTIVE_SIDEBAR_TAB_STORAGE_KEY) === 'queries'
-      ? 'queries'
-      : 'chat';
+    return localStorage.getItem(this.ACTIVE_SIDEBAR_TAB_STORAGE_KEY) === 'queries' ? 'queries' : 'chat';
   }
 
   private saveActiveSidebarTab(): void {
@@ -458,7 +457,7 @@ export class AichatComponent {
   deleteConversation(event: Event, id: string): void {
     event.stopPropagation();
 
-    const conversation = this.conversations.find(c => c.id === id);
+    const conversation = this.conversations.find((c) => c.id === id);
 
     if (!conversation) {
       return;
@@ -475,12 +474,12 @@ export class AichatComponent {
       rejectButtonStyleClass: 'p-button-secondary p-button-text',
       accept: () => {
         this.confirmDeleteConversation(id);
-      }
+      },
     });
   }
 
   private confirmDeleteConversation(id: string): void {
-    this.conversations = this.conversations.filter(c => c.id !== id);
+    this.conversations = this.conversations.filter((c) => c.id !== id);
 
     if (this.activeConversationId === id) {
       this.activeConversationId = this.conversations[0]?.id ?? null;
@@ -508,7 +507,7 @@ export class AichatComponent {
       return;
     }
 
-    const conversation = this.conversations.find(c => c.id === this.editingConversationId);
+    const conversation = this.conversations.find((c) => c.id === this.editingConversationId);
 
     if (!conversation) {
       this.cancelConversationTitleEdit(event);
@@ -517,9 +516,7 @@ export class AichatComponent {
 
     const trimmed = this.editingConversationTitle.trim();
 
-    conversation.title = trimmed.length > 0
-      ? trimmed
-      : 'New chat';
+    conversation.title = trimmed.length > 0 ? trimmed : 'New chat';
 
     this.editingConversationId = null;
     this.editingConversationTitle = '';
@@ -547,9 +544,7 @@ export class AichatComponent {
 
     const trimmed = text.trim();
 
-    conversation.title = trimmed.length > 28
-      ? trimmed.substring(0, 28) + '...'
-      : trimmed;
+    conversation.title = trimmed.length > 28 ? trimmed.substring(0, 28) + '...' : trimmed;
   }
 
   sendMessage(): void {
@@ -571,7 +566,8 @@ export class AichatComponent {
       text,
       mappable: false,
       loading: false,
-      purpose: 'standard'
+      purpose: 'standard',
+      statements: [],
     };
 
     conversation.draft = '';
@@ -585,7 +581,8 @@ export class AichatComponent {
       text: '',
       mappable: false,
       loading: true,
-      purpose: 'standard'
+      purpose: 'standard',
+      statements: [],
     };
 
     conversation.messages.push(system);
@@ -598,25 +595,25 @@ export class AichatComponent {
     const systemMessageId = system.id;
     const sessionId = conversation.sessionId;
 
-    this.chatService.sendMessage(sessionId, message, statusUrl => {
-      // Persist the job's status URL onto the placeholder message so that
-      // if the page is closed or reloaded before the job settles,
-      // reconcilePendingJobs() can resume polling it (or fail it cleanly)
-      // on the next boot instead of leaving a permanent busy spinner.
-      system.pendingStatusUrl = statusUrl;
-      this.saveConversations();
-    })
-      .then(response => {
-        const targetConversation = this.conversations.find(c => c.id === conversationId);
+    this.chatService
+      .sendMessage(sessionId, message, (statusUrl) => {
+        // Persist the job's status URL onto the placeholder message so that
+        // if the page is closed or reloaded before the job settles,
+        // reconcilePendingJobs() can resume polling it (or fail it cleanly)
+        // on the next boot instead of leaving a permanent busy spinner.
+        system.pendingStatusUrl = statusUrl;
+        this.saveConversations();
+      })
+      .then((response) => {
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
 
         if (!targetConversation) {
           return;
         }
 
-        const index = targetConversation.messages.findIndex(m => m.id === systemMessageId);
+        const index = targetConversation.messages.findIndex((m) => m.id === systemMessageId);
 
         if (index !== -1) {
-
           targetConversation.messages[index] = parseText({
             ...system,
             text: response.text,
@@ -625,23 +622,23 @@ export class AichatComponent {
             loading: false,
             location: response.location,
             reasoning: response.reasoning,
-            pendingStatusUrl: undefined
+            pendingStatusUrl: undefined,
           });
 
           this.refreshRenderedMessages();
           this.saveConversations();
         }
       })
-      .catch(error => {
+      .catch((error) => {
         this.errorService.handleError(error);
 
-        const targetConversation = this.conversations.find(c => c.id === conversationId);
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
 
         if (!targetConversation) {
           return;
         }
 
-        const index = targetConversation.messages.findIndex(m => m.id === systemMessageId);
+        const index = targetConversation.messages.findIndex((m) => m.id === systemMessageId);
 
         if (index !== -1) {
           targetConversation.messages[index] = {
@@ -649,7 +646,7 @@ export class AichatComponent {
             text: 'An error occurred',
             loading: false,
             purpose: 'info',
-            pendingStatusUrl: undefined
+            pendingStatusUrl: undefined,
           };
 
           this.refreshRenderedMessages();
@@ -657,7 +654,7 @@ export class AichatComponent {
         }
       })
       .finally(() => {
-        const targetConversation = this.conversations.find(c => c.id === conversationId);
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
 
         if (targetConversation) {
           targetConversation.loading = false;
@@ -692,7 +689,7 @@ export class AichatComponent {
     let hadUnresolvableStuckMessage = false;
 
     for (const conversation of this.conversations) {
-      const stuckMessage = conversation.messages.find(m => m.loading);
+      const stuckMessage = conversation.messages.find((m) => m.loading);
 
       if (!stuckMessage) {
         continue;
@@ -717,15 +714,19 @@ export class AichatComponent {
     conversation.loading = true;
     this.refreshRenderedMessages();
 
-    this.chatService.resumePrompt(statusUrl)
-      .then(response => {
-        const index = conversation.messages.findIndex(m => m.id === message.id);
+    this.chatService
+      .resumePrompt(statusUrl)
+      .then((response) => {
+        const index = conversation.messages.findIndex((m) => m.id === message.id);
 
         if (index !== -1) {
-          conversation.messages[index] = parseText({ ...response, id: message.id });
+          conversation.messages[index] = parseText({
+            ...response,
+            id: message.id,
+          });
         }
       })
-      .catch(error => {
+      .catch((error) => {
         // The job either explicitly failed, the server no longer
         // recognizes it (most likely it restarted while this message was
         // pending), or it didn't finish within the polling deadline -- in
@@ -741,7 +742,7 @@ export class AichatComponent {
   }
 
   private failStuckMessage(conversation: ChatConversation, message: ChatMessage): void {
-    const index = conversation.messages.findIndex(m => m.id === message.id);
+    const index = conversation.messages.findIndex((m) => m.id === message.id);
 
     if (index === -1) {
       return;
@@ -752,7 +753,7 @@ export class AichatComponent {
       text: 'This request was interrupted and could not be completed. Please try again.',
       loading: false,
       purpose: 'info',
-      pendingStatusUrl: undefined
+      pendingStatusUrl: undefined,
     };
   }
 
@@ -771,12 +772,14 @@ export class AichatComponent {
   }
 
   viewCachedQuery(query: CachedExplorerPages): void {
-    this.store.dispatch(ExplorerActions.showPagesOnMap({
-      pages: query.pages,
-      zoomMap: true,
-      step: WorkflowStep.MapAndResults,
-      data: { pageCacheId: query.id }
-    }));
+    this.store.dispatch(
+      ExplorerActions.showPagesOnMap({
+        pages: query.pages,
+        zoomMap: true,
+        step: WorkflowStep.MapAndResults,
+        data: { pageCacheId: query.id },
+      })
+    );
   }
 
   openSavedQueryChat(query: CachedExplorerPages): void {
@@ -844,7 +847,7 @@ export class AichatComponent {
       rejectButtonStyleClass: 'p-button-secondary p-button-text',
       accept: () => {
         this.explorerSessionState.deleteCachedPages(query.id);
-      }
+      },
     });
   }
 
@@ -861,9 +864,7 @@ export class AichatComponent {
   getMessageQueryId(message: ChatMessage): string | null {
     const history = this.getMappableHistory(message);
 
-    return history
-      ? this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100)
-      : null;
+    return history ? this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100) : null;
   }
 
   private getSavedQueryIndexForConversation(conversation: ChatConversation, message: ChatMessage): number | null {
@@ -910,15 +911,16 @@ export class AichatComponent {
 
     this.mapLoading = true;
 
-    this.chatService.getLocations(history, 0, 100)
-      .then(pages => {
+    this.chatService
+      .getLocations(history, 0, 100)
+      .then((pages) => {
         if (!this.explorerSessionState.hasResults(pages)) {
           this.messageService.add({
             key: 'explorer',
             severity: 'info',
             summary: 'Info',
             detail: 'The query did not return any results!',
-            sticky: true
+            sticky: true,
           });
           return;
         }
@@ -926,7 +928,7 @@ export class AichatComponent {
         this.explorerSessionState.saveCachedPages(queryId);
         this.scrollToSavedQuery(queryId);
       })
-      .catch(error => this.errorService.handleError(error))
+      .catch((error) => this.errorService.handleError(error))
       .finally(() => {
         this.mapLoading = false;
       });
@@ -975,9 +977,11 @@ export class AichatComponent {
     return `chat-message-${messageId}`;
   }
 
-  private findMappableMessageForQueryId(queryId: string): { conversation: ChatConversation; message: ChatMessage } | null {
+  private findMappableMessageForQueryId(
+    queryId: string
+  ): { conversation: ChatConversation; message: ChatMessage } | null {
     for (const conversation of this.conversations) {
-      const mappableMessages = conversation.messages.filter(message => message.mappable);
+      const mappableMessages = conversation.messages.filter((message) => message.mappable);
 
       for (const message of mappableMessages) {
         const history = this.getMappableHistoryForConversation(conversation, message);
@@ -1007,17 +1011,17 @@ export class AichatComponent {
     return this.getMappableHistoryForConversation(conversation, message);
   }
 
-  private getMappableHistoryForConversation(conversation: ChatConversation, message: ChatMessage): ChatMessage[] | null {
-
-    const index = conversation.messages.findIndex(m => m.id === message.id);
+  private getMappableHistoryForConversation(
+    conversation: ChatConversation,
+    message: ChatMessage
+  ): ChatMessage[] | null {
+    const index = conversation.messages.findIndex((m) => m.id === message.id);
 
     if (index === -1) {
       return null;
     }
 
-    return conversation.messages
-      .slice(0, index + 1)
-      .filter(m => m.purpose === 'standard');
+    return conversation.messages.slice(0, index + 1).filter((m) => m.purpose === 'standard');
   }
 
   mapIt(message: ChatMessage): void {
@@ -1035,9 +1039,10 @@ export class AichatComponent {
 
     this.mapLoading = true;
 
-    this.chatService.getLocations(history, 0, 100)
-      .then(pages => {
-        let total = pages.map(p => p.count).reduce((a,b) => a+b, 0);
+    this.chatService
+      .getLocations(history, 0, 100)
+      .then((pages) => {
+        let total = pages.map((p) => p.count).reduce((a, b) => a + b, 0);
 
         if (total === 0) {
           this.messageService.add({
@@ -1045,25 +1050,25 @@ export class AichatComponent {
             severity: 'info',
             summary: 'Info',
             detail: 'The query did not return any results!',
-            sticky: true
+            sticky: true,
           });
           return;
         }
 
-        const step = message.ambiguous
-          ? WorkflowStep.DisambiguateObject
-          : WorkflowStep.MapAndResults;
+        const step = message.ambiguous ? WorkflowStep.DisambiguateObject : WorkflowStep.MapAndResults;
 
         const pageCacheId = this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100);
 
-        this.store.dispatch(ExplorerActions.showPagesOnMap({
-          pages,
-          zoomMap: true,
-          step,
-          data: { pageCacheId }
-        }));
+        this.store.dispatch(
+          ExplorerActions.showPagesOnMap({
+            pages,
+            zoomMap: true,
+            step,
+            data: { pageCacheId },
+          })
+        );
       })
-      .catch(error => this.errorService.handleError(error))
+      .catch((error) => this.errorService.handleError(error))
       .finally(() => {
         this.mapLoading = false;
       });
@@ -1072,19 +1077,27 @@ export class AichatComponent {
   setWorkflowStepDisambiguate(message: ChatMessage): void {
     this.mapLoading = true;
 
-    this.explorerService.fullTextLookup(message.location!)
-      .then(page => {
+    this.explorerService
+      .fullTextLookup(message.location!)
+      .then((page) => {
         const pageCacheId = this.explorerSessionState.getOrCreateFullTextLookupId(message.location!);
         this.explorerSessionState.cachePages([page], 'full-text-disambiguation', pageCacheId, message.location);
 
-        this.store.dispatch(ExplorerActions.setPages({
-          pages: [page],
-          zoomMap: true
-        }));
+        this.store.dispatch(
+          ExplorerActions.setPages({
+            pages: [page],
+            zoomMap: true,
+          })
+        );
 
-        this.store.dispatch(ExplorerActions.setWorkflowStep({ step: WorkflowStep.DisambiguateObject, data: { pageCacheId } }));
+        this.store.dispatch(
+          ExplorerActions.setWorkflowStep({
+            step: WorkflowStep.DisambiguateObject,
+            data: { pageCacheId },
+          })
+        );
       })
-      .catch(error => this.errorService.handleError(error))
+      .catch((error) => this.errorService.handleError(error))
       .finally(() => {
         this.mapLoading = false;
       });
@@ -1093,17 +1106,21 @@ export class AichatComponent {
   clear(): void {
     const conversation = this.activeConversation;
 
-    this.store.dispatch(ExplorerActions.setPages({
-      pages: [{
-        locations: [],
-        statement: '',
-        type: null,
-        limit: 100,
-        offset: 0,
-        count: 0
-      }],
-      zoomMap: false
-    }));
+    this.store.dispatch(
+      ExplorerActions.setPages({
+        pages: [
+          {
+            locations: [],
+            statement: '',
+            type: null,
+            limit: 100,
+            offset: 0,
+            count: 0,
+          },
+        ],
+        zoomMap: false,
+      })
+    );
 
     if (conversation) {
       conversation.messages = [];
@@ -1145,17 +1162,49 @@ export class AichatComponent {
   private inspectLocationUri(uri: string): void {
     this.mapLoading = true;
 
-    this.explorerService.getAttributes(uri, true)
-      .then(geoObject => {
-        this.store.dispatch(ExplorerActions.setWorkflowStep({
-          step: WorkflowStep.InspectObject,
-          data: geoObject,
-          zoomMap: true
-        }));
+    this.explorerService
+      .getAttributes(uri, true)
+      .then((geoObject) => {
+        this.store.dispatch(
+          ExplorerActions.setWorkflowStep({
+            step: WorkflowStep.InspectObject,
+            data: geoObject,
+            zoomMap: true,
+          })
+        );
       })
-      .catch(error => this.errorService.handleError(error))
+      .catch((error) => this.errorService.handleError(error))
       .finally(() => {
         this.mapLoading = false;
       });
+  }
+
+  createFact(event: Event, message: ChatMessage): void {
+    event.stopPropagation();
+
+    this.fact = {
+      name: '',
+      description: '',
+      projectId: this.projects.length > 0 ? this.projects[0].id : null,
+      projectName: '',
+      statements: message.statements,
+      text: message.text,
+    };
+
+    this.visible = true;
+  }
+
+  saveFact(): void {
+    if (this.fact != null) {
+      this.factService
+        .save(this.fact)
+        .then((f) => {
+          this.fact = null;
+          this.visible = false;
+
+          this.projectService.getAll().then((projects) => (this.projects = projects));
+        })
+        .catch((error) => this.errorService.handleError(error));
+    }
   }
 }

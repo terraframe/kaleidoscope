@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
@@ -19,6 +20,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityManager;
 import net.geoprism.geoai.explorer.core.config.TestConfiguration;
 import net.geoprism.geoai.explorer.core.entity.Project;
 import net.geoprism.geoai.explorer.core.mock.MockDataTest;
@@ -131,5 +133,60 @@ public class ProjectRepositoryIntegrationTest extends MockDataTest
   public void testSave_NullNameFails()
   {
     assertThrows(DataIntegrityViolationException.class, () -> repository.save(newProject(null)));
+  }
+
+  @Autowired
+  private EntityManager entityManager;
+
+  /**
+   * Writes pending changes and empties the persistence context, so the next
+   * read comes from the database rather than the cached entity.
+   */
+  private void flushAndClear()
+  {
+    entityManager.flush();
+    entityManager.clear();
+  }
+
+  @Test
+  public void testSave_SetsCreatedDate()
+  {
+    Instant before = Instant.now().minusSeconds(1);
+
+    Project saved = repository.save(newProject("Project A"));
+
+    assertNotNull(saved.getCreatedDate());
+
+    flushAndClear();
+
+    Instant createdDate = repository.findById(saved.getId()).orElseThrow().getCreatedDate();
+    Instant after = Instant.now().plusSeconds(1);
+
+    assertNotNull(createdDate);
+    assertTrue(createdDate.isAfter(before), "createdDate " + createdDate + " should be after " + before);
+    assertTrue(createdDate.isBefore(after), "createdDate " + createdDate + " should be before " + after);
+  }
+
+  @Test
+  public void testUpdate_DoesNotChangeCreatedDate()
+  {
+    Project saved = repository.save(newProject("Project A"));
+
+    flushAndClear();
+
+    Project project = repository.findById(saved.getId()).orElseThrow();
+    Instant original = project.getCreatedDate();
+
+    // Change a regular field and try to overwrite the creation timestamp
+    project.setName("Renamed");
+    project.setCreatedDate(Instant.EPOCH);
+    repository.save(project);
+
+    flushAndClear();
+
+    Project reloaded = repository.findById(saved.getId()).orElseThrow();
+
+    assertEquals("Renamed", reloaded.getName());
+    assertEquals(original, reloaded.getCreatedDate());
   }
 }
