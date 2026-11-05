@@ -1,6 +1,8 @@
 package net.geoprism.geoai.explorer.core.service;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -30,13 +32,16 @@ public class ReportGenerationIntegrationTest extends MockDataTest
 {
 
   @Autowired
-  private BedrockService   service;
+  private BedrockService        service;
 
   @MockitoBean
-  private ProjectService   projectService;
+  private ProjectService        projectService;
 
   @MockitoBean
-  private FactService discoveryService;
+  private FactService           factService;
+
+  @MockitoBean
+  private ReportTemplateService templateService;
 
   @BeforeEach
   public void setUp()
@@ -101,11 +106,14 @@ public class ReportGenerationIntegrationTest extends MockDataTest
 
     when(projectService.fetchList()).thenReturn(List.of(project));
 
-    when(discoveryService.fetchListByProject(anyLong())).thenReturn(List.of(cost, benefits, output, jobs));
-    when(discoveryService.findById(1L)).thenReturn(Optional.of(cost));
-    when(discoveryService.findById(2L)).thenReturn(Optional.of(benefits));
-    when(discoveryService.findById(3L)).thenReturn(Optional.of(output));
-    when(discoveryService.findById(4L)).thenReturn(Optional.of(jobs));
+    when(factService.fetchListByProject(anyLong())).thenReturn(List.of(cost, benefits, output, jobs));
+    when(factService.findById(1L)).thenReturn(Optional.of(cost));
+    when(factService.findById(2L)).thenReturn(Optional.of(benefits));
+    when(factService.findById(3L)).thenReturn(Optional.of(output));
+    when(factService.findById(4L)).thenReturn(Optional.of(jobs));
+
+    when(templateService.getAll()).thenReturn(List.of(createReportTemplate()));
+    when(templateService.get(anyString())).thenReturn(createReportTemplate());
   }
 
   @Test
@@ -128,13 +136,16 @@ public class ReportGenerationIntegrationTest extends MockDataTest
   public void testFactSuggestions() throws InterruptedException, ExecutionException, TimeoutException
   {
     String input = """
-            Generate a report using template 'PLAN_EVAL' for project 1.  What facts are most appropriate for National Economic Development (NED) Analysis section?""";
-    
+        Generate a report using template 'PLAN_EVAL' for project 1.  What facts are most appropriate for National Economic Development (NED) Analysis section?""";
+
     String sessionId = UUID.randomUUID().toString();
-    
+
     String response = service.report(sessionId, input);
-    
+
     System.out.println(response);
+
+    assertTrue(response.toLowerCase().contains("**1") || response.toLowerCase().contains("fact 1"), "Failed assumption with response" + response);
+    assertTrue(response.toLowerCase().contains("**2") || response.toLowerCase().contains("fact 2"), "Failed assumption with response" + response);
   }
-  
+
 }

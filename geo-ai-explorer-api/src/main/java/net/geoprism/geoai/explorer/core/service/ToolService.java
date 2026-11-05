@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class ToolService
 {
+  private static final Logger   log                 = LoggerFactory.getLogger(ToolService.class);
+
   public static final String    QUERY_TOOL          = "query";
 
   public static final String    RESOLUTION_TOOL     = "name_resolution";
@@ -240,6 +244,8 @@ public class ToolService
 
   public ToolResponse execute(String toolName, JsonNode argsNode)
   {
+    log.info("Executing tool - " + toolName);
+
     if (QUERY_TOOL.equals(toolName))
     {
       String statement = argsNode.get(SPARQL_PARAM).asString("");
@@ -262,15 +268,6 @@ public class ToolService
       return ToolResponse.builder() //
           .name(toolName) //
           .text(JsonMapper.shared().writeValueAsString(results)) //
-          .build();
-    }
-    else if (LIST_TEMPLATES_TOOL.equals(toolName))
-    {
-      List<Project> projects = this.projectService.fetchList();
-
-      return ToolResponse.builder() //
-          .name(toolName) //
-          .text(JsonMapper.shared().writeValueAsString(projects)) //
           .build();
     }
     else if (LIST_PROJECT_TOOL.equals(toolName))

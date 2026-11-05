@@ -22,6 +22,12 @@ public abstract class CrudServiceImpl<T, K> implements CrudService<T, K>
   }
 
   @Override
+  public T getOrThrow(K id)
+  {
+    return this.repository().findById(id).orElseThrow(() -> new RuntimeException("Unable to find object with id [" + id + "]"));
+  }
+
+  @Override
   public List<T> fetchList()
   {
     return (List<T>) this.repository().findAll();
