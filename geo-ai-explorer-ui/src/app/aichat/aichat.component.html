@@ -17,7 +17,15 @@
             <blockquote class="save-fact-quote markdown-content" [innerHTML]="factTextHtml"></blockquote>
           }
           <label for="save-fact-name">Name</label>
-          <input id="save-fact-name" type="text" [(ngModel)]="fact.name" name="name" autocomplete="off" required />
+          <input
+            id="save-fact-name"
+            type="text"
+            [(ngModel)]="fact.name"
+            name="name"
+            autocomplete="off"
+            maxlength="255"
+            required
+          />
           <label for="save-fact-description">Description</label>
           <textarea
             id="save-fact-description"
@@ -74,6 +82,25 @@
           </p-button>
         </div>
       </div>
+    </ng-template>
+  </p-dialog>
+
+  <p-dialog
+    [header]="queryFact?.name ?? 'Query'"
+    [(visible)]="queryVisible"
+    [modal]="true"
+    [draggable]="false"
+    [resizable]="false"
+    [dismissableMask]="true"
+    appendTo="body"
+    styleClass="fact-query-dialog"
+  >
+    @if (queryFact != null) {
+      <pre class="fact-query-full"><code>{{ factStatements(queryFact) }}</code></pre>
+    }
+    <ng-template #footer>
+      <p-button severity="secondary" [label]="queryCopied ? 'Copied' : 'Copy'" (onClick)="copyFactQuery()"> </p-button>
+      <p-button label="Close" (onClick)="queryVisible = false"> </p-button>
     </ng-template>
   </p-dialog>
 
@@ -207,7 +234,7 @@
             (onClick)="toggleChatTypeChooser()"
           >
             <fa-icon [icon]="choosingChatType ? closeConversationIcon : newConversationIcon"></fa-icon>
-            <span>{{ choosingChatType ? 'Cancel' : 'New chat' }}</span>
+            <span>{{ choosingChatType ? 'Cancel' : 'New' }}</span>
           </p-button>
         }
         @if (activeSidebarTab === 'queries') {
@@ -292,10 +319,17 @@
                   @if (expandedFactId === fact.id) {
                     <div class="fact-details">
                       @if (fact.text) {
-                        <p class="fact-text">{{ fact.text }}</p>
+                        <div class="fact-text markdown-content" [innerHTML]="factHtml(fact)"></div>
                       }
                       @if (factStatements(fact)) {
-                        <pre class="fact-statements"><code>{{ factStatements(fact) }}</code></pre>
+                        <pre
+                          class="fact-statements"
+                          role="button"
+                          tabindex="0"
+                          title="Show the full query"
+                          (click)="showFactQuery($event, fact)"
+                          (keydown.enter)="showFactQuery($event, fact)"
+                        ><code>{{ factStatements(fact) }}</code></pre>
                       }
                     </div>
                   }

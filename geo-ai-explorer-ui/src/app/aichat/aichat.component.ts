@@ -31,7 +31,13 @@ import { ChatService } from '../service/chat-service.service';
 import { initialState, parseText } from '../state/chat.state';
 import { ChatMessage, Fact, Project } from '../models/chat.model';
 import { ErrorService } from '../service/error-service.service';
-import { ExplorerActions, getWorkflowData, getWorkflowStep, WorkflowStep } from '../state/explorer.state';
+import {
+  ExplorerActions,
+  getReportTemplates,
+  getWorkflowData,
+  getWorkflowStep,
+  WorkflowStep,
+} from '../state/explorer.state';
 import { ExplorerService } from '../service/explorer.service';
 import { GeoObject } from '../models/geoobject.model';
 import { CachedExplorerPages, ExplorerSessionStateService } from '../service/explorer-session-state.service';
@@ -130,6 +136,7 @@ export class AichatComponent {
   savedQueries$: Observable<CachedExplorerPages[]>;
   onWorkflowStepChange: Subscription;
   onSavedQueriesChange: Subscription;
+  onReportTemplatesChange: Subscription;
 
   public conversations: ChatConversation[] = [];
   public activeConversationId: string | null = null;
@@ -155,6 +162,10 @@ export class AichatComponent {
   public facts: Fact[] = [];
   public factGroups: FactGroup[] = [];
   public expandedFactId: number | null = null;
+  /** The fact whose full query is open in the query dialog. */
+  queryFact: Fact | null = null;
+  queryVisible = false;
+  queryCopied = false;
   /** Names of the expanded sections in the report's Facts by section step. */
   public expandedSections = new Set<string>();
   public highlightSavedQueryId: string | null = null;
@@ -194,8 +205,6 @@ export class AichatComponent {
     private factService: FactService,
     private projectService: ProjectService
   ) {
-    this.templates = this.reportService.getTemplates();
-
     this.savedQueries$ = this.explorerSessionState.savedQueries$;
     this.activeSidebarTab = this.loadActiveSidebarTab();
     this.onSavedQueriesChange = this.savedQueries$.subscribe((savedQueries) => {
@@ -225,12 +234,18 @@ export class AichatComponent {
     // when this component is (re)constructed, e.g. a hard refresh.
     this.handleLocationHashNavigation();
 
+    // Report templates arrive with the app's configuration.
+    this.onReportTemplatesChange = this.store.select(getReportTemplates).subscribe((templates) => {
+      this.templates = templates;
+    });
+
     this.loadProjectsAndFacts();
   }
 
   ngOnDestroy(): void {
     this.onWorkflowStepChange.unsubscribe();
     this.onSavedQueriesChange.unsubscribe();
+    this.onReportTemplatesChange.unsubscribe();
   }
 
   @HostListener('window:hashchange')
@@ -679,6 +694,7 @@ export class AichatComponent {
             sessionId,
             message,
             conversation.report ?? this.normalizeReportSelection(undefined),
+            this.selectedTemplate,
             this.selectedProject,
             this.selectedFacts
           )
@@ -1276,7 +1292,9 @@ export class AichatComponent {
   }
 
   get selectedTemplate(): ReportTemplate | undefined {
-    return this.reportService.getTemplate(this.activeReport?.templateId);
+    const templateId = this.activeReport?.templateId;
+
+    return this.templates.find((t) => t.id === templateId);
   }
 
   get selectedProject(): Project | undefined {
@@ -1536,6 +1554,29 @@ export class AichatComponent {
 
   toggleFactDetails(fact: Fact): void {
     this.expandedFactId = this.expandedFactId === fact.id ? null : (fact.id ?? null);
+  }
+
+  /** A fact's answer text, rendered from markdown like the chat message it came from. */
+  factHtml(fact: Fact): string {
+    return this.renderMarkdown(fact.text);
+  }
+
+  /** Opens a fact's full query in a dialog; the card shows only its first lines. */
+  showFactQuery(event: Event, fact: Fact): void {
+    event.stopPropagation();
+
+    this.queryFact = fact;
+    this.queryCopied = false;
+    this.queryVisible = true;
+  }
+
+  copyFactQuery(): void {
+    if (this.queryFact != null) {
+      navigator.clipboard
+        .writeText(this.factStatements(this.queryFact))
+        .then(() => (this.queryCopied = true))
+        .catch((error) => this.errorService.handleError(error));
+    }
   }
 
   factStatements(fact: Fact): string {

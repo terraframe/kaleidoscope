@@ -1,13 +1,13 @@
 import { ReportTemplate } from '../models/report.model';
 
 /*
- * Mock report templates for ReportService until the back end is hooked up.
+ * Report templates for tests, as the server sends them in the configuration.
  *
- * GENERATED from geo-ai-explorer-api/src/main/resources/report-templates/*.json
- * (template and reference notes left out, as the API does). Don't edit by hand; delete this
- * file once templates come from the server.
+ * Generated from geo-ai-explorer-api/src/main/resources/report-templates/*.json
+ * (template and reference notes left out, as the API does). Tests rely on
+ * their ids and section names, not on staying in sync with those files.
  */
-export const MOCK_TEMPLATES: ReportTemplate[] = [
+export const TEMPLATES: ReportTemplate[] = [
   {
     id: 'PLAN_EVAL_234',
     name: 'Plan Evaluation (33 CFR Part 234)',

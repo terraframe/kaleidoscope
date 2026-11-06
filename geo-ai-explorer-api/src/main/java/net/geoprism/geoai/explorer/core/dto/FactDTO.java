@@ -7,6 +7,7 @@ import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,6 +21,7 @@ public class FactDTO
 {
   private Long         id;
 
+  @Size(max = 255, message = "name must be at most 255 characters")
   private String       name;
 
   private String       description;
@@ -30,6 +32,7 @@ public class FactDTO
 
   private Long         projectId;
 
+  @Size(max = 255, message = "projectName must be at most 255 characters")
   private String       projectName;
 
   @JsonIgnore

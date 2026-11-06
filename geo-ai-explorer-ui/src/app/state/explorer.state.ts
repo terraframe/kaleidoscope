@@ -7,6 +7,7 @@ import { VectorLayer } from "../models/vector-layer.model";
 import { Configuration } from "../models/configuration.model";
 import { LocationPage } from "../models/chat.model";
 import { defaultStyles } from "../explorer/defaultQueries";
+import { ReportTemplate } from "../models/report.model";
 
 export const ExplorerActions = createActionGroup({
     source: 'explorer',
@@ -51,6 +52,7 @@ export interface ExplorerStateModel {
     highlightedObject: GeoObject | null;
     zoomMap: boolean;
     vectorLayers: VectorLayer[];
+    reportTemplates: ReportTemplate[];
     pages: LocationPage[];
     workflowStep: WorkflowStep;
     workflowData?: any;
@@ -64,6 +66,7 @@ export const initialState: ExplorerStateModel = {
     zoomMap: false,
     highlightedObject: null,
     vectorLayers: [],
+    reportTemplates: [],
     workflowStep: WorkflowStep.FullScreenChat,
     workflowHistory: [],
     pages: [{ 
@@ -171,7 +174,7 @@ export const explorerReducer = createReducer(
     // Set the vector layers & styles
     on(ExplorerActions.setConfiguration, (state, configuration) => {
 
-        return { ...state, vectorLayers: configuration.layers, styles: configuration.styles }
+        return { ...state, vectorLayers: configuration.layers, styles: configuration.styles, reportTemplates: configuration.reportTemplates ?? [] }
     }),
 
     // Set the vector layer
@@ -310,6 +313,10 @@ export const getZoomMap = createSelector(selector, (s) => {
 
 export const getStyles = createSelector(selector, (s) => {
     return s.styles;
+});
+
+export const getReportTemplates = createSelector(selector, (s) => {
+    return s.reportTemplates;
 });
 
 export const highlightedObject = createSelector(selector, (s) => {

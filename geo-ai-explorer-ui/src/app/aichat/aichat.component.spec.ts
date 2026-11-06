@@ -5,6 +5,9 @@ import { AichatComponent } from './aichat.component';
 import { provideTestApp } from '../testing/test-providers';
 import { Fact, Project } from '../models/chat.model';
 import { apiBase } from '../service/url.util';
+import { Store } from '@ngrx/store';
+import { ExplorerActions } from '../state/explorer.state';
+import { TEMPLATES } from '../testing/report-templates.fixture';
 
 const PROJECTS: Project[] = [
   { id: 1, name: 'Upper Guadalupe River GRR' },
@@ -70,11 +73,19 @@ describe('AichatComponent', () => {
     }).compileComponents();
 
     http = TestBed.inject(HttpTestingController);
+    // Templates come with the app's configuration, which the explorer loads.
+    TestBed.inject(Store).dispatch(
+      ExplorerActions.setConfiguration({ styles: {}, layers: [], reportTemplates: TEMPLATES })
+    );
     fixture = TestBed.createComponent(AichatComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
 
     await flushProjectsAndFacts();
+  });
+
+  it('takes report templates from the configuration', () => {
+    expect(component.templates.map((t) => t.id)).toEqual(TEMPLATES.map((t) => t.id));
   });
 
   it('loads projects and their facts from the server', () => {
@@ -352,6 +363,23 @@ describe('AichatComponent', () => {
     component.assignFactToSection(component.selectedTemplate!.sections[0], fact.id!);
 
     expect(component.unassignedFacts).toEqual([]);
+  });
+
+  it('renders a fact card answer as markdown and opens its full query in a dialog', () => {
+    const fact = component.facts[0];
+    fact.text = 'About **42,180** people.';
+    component.setActiveSidebarTab('facts');
+    component.toggleFactDetails(fact);
+    fixture.detectChanges();
+
+    const card: HTMLElement = fixture.nativeElement.querySelector('.fact-card');
+    expect(card.querySelector('.fact-text strong')!.textContent).toBe('42,180');
+
+    (card.querySelector('.fact-statements') as HTMLElement).click();
+
+    expect(component.queryVisible).toBeTrue();
+    expect(component.queryFact).toBe(fact);
+    expect(component.expandedFactId).toBe(fact.id!);
   });
 
   it('has no add-to-report controls on Facts tab cards', () => {

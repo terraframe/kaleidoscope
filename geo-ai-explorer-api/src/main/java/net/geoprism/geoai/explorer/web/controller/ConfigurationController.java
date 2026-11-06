@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import net.geoprism.geoai.explorer.core.model.Style;
 import net.geoprism.geoai.explorer.core.model.VectorLayer;
 import net.geoprism.geoai.explorer.core.service.ConfigurationService;
+import net.geoprism.geoai.explorer.core.service.ReportTemplateService;
 import net.geoprism.geoai.explorer.web.model.Configuration;
 
 @RestController
@@ -39,6 +40,9 @@ public class ConfigurationController
   @Autowired
   private ConfigurationService service;
 
+  @Autowired
+  private ReportTemplateService templateService;
+
   @GetMapping("/api/configuration/get")
   @ResponseBody
   public ResponseEntity<Configuration> getConfiguration() throws IOException
@@ -46,6 +50,7 @@ public class ConfigurationController
     Configuration configuration = new Configuration();
     configuration.setStyles(this.service.getStyles());
     configuration.setLayers(this.service.getVectorLayers());
+    configuration.setReportTemplates(this.templateService.getAll());
 
     return new ResponseEntity<Configuration>(configuration, HttpStatus.OK);
   }

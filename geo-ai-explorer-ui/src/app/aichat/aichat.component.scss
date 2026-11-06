@@ -974,6 +974,7 @@ button {
 }
 
 .fact-statements {
+  cursor: zoom-in;
   margin: 0;
   padding: 6px 8px;
   border-radius: 6px;
@@ -1737,6 +1738,34 @@ button {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+// Shows the first lines of the query, ending in "…"; clicking opens all of it.
+// The clamp is on the code, not the pre, so the pre's padding doesn't show part of the next line.
+.fact-statements code {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  overflow: hidden;
+}
+
+.fact-statements:hover,
+.fact-statements:focus-visible {
+  outline: 1px solid #10b981;
+}
+
+::ng-deep .fact-query-dialog {
+  width: min(48rem, calc(100vw - 2rem));
+}
+
+.fact-query-full {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 6px;
+  background: var(--code-background);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 ::ng-deep .new-project-option {
