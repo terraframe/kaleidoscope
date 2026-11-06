@@ -24,7 +24,7 @@ describe('ChatServiceService', () => {
   it('sends the prompt in a POST body', () => {
     const prompt = 'SELECT ?s ?p ?o WHERE { ?s ?p ?o } ' + 'x'.repeat(20000);
 
-    service.sendMessage('session-1', { id: 'm1', sender: 'user', text: prompt, mappable: false, purpose: 'standard' });
+    service.sendMessage('session-1', { id: 'm1', sender: 'user', text: prompt, mappable: false, purpose: 'standard', statements: [] });
 
     const request = httpTesting.expectOne(apiBase() + 'api/chat/prompt/start');
 

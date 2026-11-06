@@ -9,6 +9,7 @@ import net.geoprism.geoai.explorer.core.dto.FactDTO;
 import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.entity.Project;
 import net.geoprism.geoai.explorer.core.repository.FactRepository;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class FactServiceImpl extends CrudServiceImpl<Fact, Long> implements FactService
@@ -56,17 +57,17 @@ public class FactServiceImpl extends CrudServiceImpl<Fact, Long> implements Fact
   @Override
   public FactDTO save(FactDTO dto)
   {
-    Project project = ( dto.getProjectId() == null ) ? //
+    Project project = ( dto.getProjectId() != null ) ? //
         this.projectService.getOrThrow(dto.getProjectId()) : //
         this.projectService.save(Project.builder().name(dto.getProjectName()).build());
 
-    Fact entity = ( dto.getId() == null ) ? //
+    Fact entity = ( dto.getId() != null ) ? //
         this.getOrThrow(dto.getId()) : //
         Fact.builder().project(project).build();
 
     entity.setDescription(dto.getDescription());
     entity.setName(dto.getName());
-    entity.setStatements(dto.getStatements());
+    entity.setStatements(JsonMapper.shared().writeValueAsString(dto.getStatements()));
     entity.setText(dto.getText());
 
     return toDTO(repository.save(entity), project);
@@ -84,7 +85,7 @@ public class FactServiceImpl extends CrudServiceImpl<Fact, Long> implements Fact
         .id(entity.getId()) //
         .name(entity.getName()) //
         .description(entity.getDescription()) //
-        .statements(entity.getStatements()) //
+        .statements(JsonMapper.shared().readerForListOf(String.class).readValue(entity.getStatements())) //
         .text(entity.getText()) //
         .projectId(project.getId()) //
         .projectName(project.getName()) //

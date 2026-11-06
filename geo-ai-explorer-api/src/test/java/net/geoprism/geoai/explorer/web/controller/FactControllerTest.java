@@ -45,7 +45,7 @@ import tools.jackson.databind.json.JsonMapper;
 @ExtendWith(MockitoExtension.class)
 public class FactControllerTest extends MockDataTest
 {
-  private static final String BASE_URL = "/api/fact/facts";
+  private static final String BASE_URL = "/api/facts";
 
   @Mock
   private FactService         service;
@@ -77,7 +77,7 @@ public class FactControllerTest extends MockDataTest
         .name("Fact A") //
         .description("Description A") //
         .text("Some text") //
-        .statements("SELECT * WHERE { ?s ?p ?o }") //
+        .statements(List.of("SELECT * WHERE { ?s ?p ?o }")) //
         .projectId(5L) //
         .build();
 
@@ -86,7 +86,7 @@ public class FactControllerTest extends MockDataTest
         .name("Fact A") //
         .description("Description A") //
         .text("Some text") //
-        .statements("SELECT * WHERE { ?s ?p ?o }") //
+        .statements(List.of("SELECT * WHERE { ?s ?p ?o }")) //
         .projectId(5L) //
         .projectName("Project A") //
         .build();
@@ -190,7 +190,7 @@ public class FactControllerTest extends MockDataTest
           .name(fact.getName()) //
           .description(fact.getDescription()) //
           .text(fact.getText()) //
-          .statements(fact.getStatements()) //
+          .statements(List.of(fact.getStatements())) //
           .projectId(fact.getProject().getId()) //
           .projectName(fact.getProject().getName()) //
           .build();

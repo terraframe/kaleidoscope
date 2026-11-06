@@ -1,5 +1,9 @@
 package net.geoprism.geoai.explorer.core.entity;
 
+import java.time.Instant;
+
+import org.hibernate.annotations.CreationTimestamp;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -26,4 +30,8 @@ public class Project
 
   @Column(name = "name", nullable = false, unique = true)
   private String name;
+
+  @CreationTimestamp
+  @Column(name = "created_date", nullable = false, updatable = false)
+  private Instant createdDate;
 }

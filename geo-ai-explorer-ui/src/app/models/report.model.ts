@@ -4,26 +4,6 @@
  */
 export type ChatType = 'exploration' | 'report';
 
-/**
- * Mirrors net.geoprism.geoai.explorer.core.dto.FactDTO. A fact is an approved
- * piece of data, saved from a data exploration chat, that a report can cite.
- */
-export interface Fact {
-  id: number;
-  name: string;
-  description: string;
-  text?: string;
-  /** The query statements (e.g. SPARQL) the fact was derived from. */
-  statements?: string;
-  projectId: number;
-  projectName: string;
-}
-
-export interface Project {
-  id: number;
-  name: string;
-}
-
 /** Mirrors net.geoprism.geoai.explorer.core.model.Section. */
 export interface ReportSection {
   name: string;

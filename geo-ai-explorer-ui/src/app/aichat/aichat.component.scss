@@ -53,9 +53,7 @@
 
 .sidebar-resize-handle {
   min-width: 6px;
-  background:
-    linear-gradient(90deg, var(--surface-border) 0, var(--surface-border) 1px, transparent 1px),
-    transparent;
+  background: linear-gradient(90deg, var(--surface-border) 0, var(--surface-border) 1px, transparent 1px), transparent;
   cursor: col-resize;
   position: relative;
   z-index: 2;
@@ -72,14 +70,14 @@
   background: var(--surface-border);
   transform: translate(-50%, -50%);
   opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease;
 }
 
 .sidebar-resize-handle:hover,
 .sidebar-resize-handle:active {
-  background:
-    linear-gradient(90deg, #94a3b8 0, #94a3b8 1px, transparent 1px),
-    rgba(15, 23, 42, 0.04);
+  background: linear-gradient(90deg, #94a3b8 0, #94a3b8 1px, transparent 1px), rgba(15, 23, 42, 0.04);
 }
 
 .sidebar-resize-handle:hover::after,
@@ -240,7 +238,11 @@
   border-radius: 999px;
   color: var(--text-color-secondary);
   border: 1px solid transparent;
-  transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    color 120ms ease;
 }
 
 .query-action:hover {
@@ -554,15 +556,17 @@
   border-radius: 8px;
   background: var(--surface-card);
   box-shadow:
-    0 4px 20px rgba(15, 23, 42, 0.10),
+    0 4px 20px rgba(15, 23, 42, 0.1),
     0 1px 4px rgba(15, 23, 42, 0.06);
-  transition: box-shadow 150ms ease, border-color 150ms ease;
+  transition:
+    box-shadow 150ms ease,
+    border-color 150ms ease;
 
   &:focus-within {
     border-color: #10b981;
     box-shadow:
       0 0 0 3px rgba(16, 185, 129, 0.12),
-      0 4px 20px rgba(15, 23, 42, 0.10);
+      0 4px 20px rgba(15, 23, 42, 0.1);
   }
 
   p-button {
@@ -1274,7 +1278,9 @@ button {
 
 .section-assignment {
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .section-assignment:not(.expanded):hover {
@@ -1616,4 +1622,49 @@ button {
     min-width: 140px;
     max-width: 200px;
   }
+}
+
+/*
+ * Narrow responsive fallback
+ */
+
+::ng-deep .save-fact-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+}
+
+.save-fact-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.save-fact-form label {
+  color: var(--text-color);
+  font-weight: 650;
+}
+
+.save-fact-form input,
+.save-fact-form select,
+.save-fact-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  padding: 0.55rem 0.65rem;
+  color: var(--text-color);
+  background: var(--surface-card);
+  font: inherit;
+}
+
+.save-fact-form input:focus,
+.save-fact-form select:focus,
+.save-fact-form textarea:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+  outline: none;
+}
+
+.save-fact-form textarea {
+  resize: vertical;
 }

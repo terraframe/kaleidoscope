@@ -1,24 +1,109 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpTestingController } from '@angular/common/http/testing';
 
 import { AichatComponent } from './aichat.component';
 import { provideTestApp } from '../testing/test-providers';
+import { Fact, Project } from '../models/chat.model';
+import { apiBase } from '../service/url.util';
+
+const PROJECTS: Project[] = [
+  { id: 1, name: 'Upper Guadalupe River GRR' },
+  { id: 2, name: 'Lower Mississippi Levee Assessment' },
+];
+
+const FACTS: Fact[] = [
+  {
+    id: 101,
+    projectId: 1,
+    projectName: 'Upper Guadalupe River GRR',
+    name: 'Population in the 1% floodplain',
+    description: 'Census population inside the 1% floodplain.',
+    text: 'About 42,180 people.',
+    statements: ['SELECT (SUM(?pop) AS ?total) WHERE { }'],
+  },
+  {
+    id: 102,
+    projectId: 1,
+    projectName: 'Upper Guadalupe River GRR',
+    name: 'Schools at risk of flooding',
+    description: 'Schools in leveed areas.',
+    text: '14 schools.',
+    statements: [],
+  },
+  {
+    id: 201,
+    projectId: 2,
+    projectName: 'Lower Mississippi Levee Assessment',
+    name: 'Leveed area real property value',
+    description: 'Real property protected by the levee system.',
+    text: 'About $2.1B.',
+    statements: [],
+  },
+];
 
 describe('AichatComponent', () => {
   let component: AichatComponent;
   let fixture: ComponentFixture<AichatComponent>;
+  let http: HttpTestingController;
+
+  /** Lets pending promise callbacks run (the app is zoneless, so whenStable doesn't wait for them). */
+  const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+  /** Answers the component's project and fact requests with the fixtures above. */
+  async function flushProjectsAndFacts(): Promise<void> {
+    http.expectOne(apiBase() + 'api/projects').flush(PROJECTS);
+    await settle();
+
+    for (const project of PROJECTS) {
+      http.expectOne(apiBase() + 'api/facts/' + project.id).flush(FACTS.filter((f) => f.projectId === project.id));
+    }
+
+    await settle();
+  }
 
   beforeEach(async () => {
     localStorage.clear();
 
     await TestBed.configureTestingModule({
       imports: [AichatComponent],
-      providers: provideTestApp()
-    })
-    .compileComponents();
-    
+      providers: provideTestApp(),
+    }).compileComponents();
+
+    http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(AichatComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+
+    await flushProjectsAndFacts();
+  });
+
+  it('loads projects and their facts from the server', () => {
+    expect(component.projects).toEqual(PROJECTS);
+    expect(component.facts.map((f) => f.id)).toEqual([101, 102, 201]);
+    expect(component.factGroups.map((g) => g.projectName)).toEqual(PROJECTS.map((p) => p.name));
+  });
+
+  it('deletes a fact on the server and removes it from reports', async () => {
+    component.newConversation(true, 'report');
+    component.selectTemplate('PLAN_EVAL_234');
+    component.selectProject(1);
+    const section = component.selectedTemplate!.sections[0];
+    component.assignFactToSection(section, 101);
+
+    const confirm = spyOn((component as any).confirmationService, 'confirm').and.callFake((options: any) =>
+      options.accept()
+    );
+    component.deleteFact(new Event('click'), component.facts[0]);
+
+    expect(confirm).toHaveBeenCalled();
+    const req = http.expectOne(apiBase() + 'api/facts/101');
+    expect(req.request.method).toBe('DELETE');
+    req.flush('Deleted Successfully');
+    await settle();
+
+    expect(component.facts.map((f) => f.id)).toEqual([102, 201]);
+    expect(component.activeReport!.factIds).toEqual([]);
+    expect(component.factsInSection(section)).toEqual([]);
   });
 
   it('should create', () => {
@@ -31,7 +116,13 @@ describe('AichatComponent', () => {
 
     expect(component.isReportChat).toBeTrue();
     expect(component.activeConversation?.title).toBe('New report');
-    expect(component.activeReport).toEqual({ templateId: null, projectId: null, factIds: [], sectionFacts: {}, sectionNotes: {} });
+    expect(component.activeReport).toEqual({
+      templateId: null,
+      projectId: null,
+      factIds: [],
+      sectionFacts: {},
+      sectionNotes: {},
+    });
     expect(component.choosingChatType).toBeFalse();
   });
 
@@ -54,9 +145,9 @@ describe('AichatComponent', () => {
     component.selectTemplate('PLAN_EVAL_234');
     component.selectProject(1);
     const section = component.selectedTemplate!.sections[0];
-    component.assignFactToSection(section, component.availableReportFacts[0].id);
+    component.assignFactToSection(section, component.availableReportFacts[0].id!);
 
-    expect(component.availableReportFacts.every(f => f.projectId === 1)).toBeTrue();
+    expect(component.availableReportFacts.every((f) => f.projectId === 1)).toBeTrue();
 
     component.selectProject(2);
 
@@ -72,18 +163,18 @@ describe('AichatComponent', () => {
     const fact = component.availableReportFacts[0];
     const before = component.requiredSectionCoverage.covered;
 
-    component.assignFactToSection(first, fact.id);
-    component.assignFactToSection(second, fact.id);
+    component.assignFactToSection(first, fact.id!);
+    component.assignFactToSection(second, fact.id!);
 
     expect(component.factsInSection(first)).toEqual([fact]);
     expect(component.factsInSection(second)).toEqual([fact]);
-    expect(component.activeReport!.factIds).toEqual([fact.id]);
+    expect(component.activeReport!.factIds).toEqual([fact.id!]);
     expect(component.factsAssignableToSection(first)).not.toContain(fact);
     expect(component.requiredSectionCoverage.covered).toBe(before + 2);
 
     // Still in another section, so it stays in the report
     component.unassignFactFromSection(first, fact);
-    expect(component.activeReport!.factIds).toEqual([fact.id]);
+    expect(component.activeReport!.factIds).toEqual([fact.id!]);
 
     // In no section now, so it leaves the report
     component.unassignFactFromSection(second, fact);
@@ -93,7 +184,7 @@ describe('AichatComponent', () => {
   it('counts a required section with notes as covered, and keeps notes across reloads', () => {
     component.newConversation(true, 'report');
     component.selectTemplate('PLAN_EVAL_234');
-    const section = component.selectedTemplate!.sections.find(s => s.required)!;
+    const section = component.selectedTemplate!.sections.find((s) => s.required)!;
     const before = component.requiredSectionCoverage.covered;
 
     component.setSectionNotes(section, 'Use the 2023 price level throughout.');
@@ -149,7 +240,7 @@ describe('AichatComponent', () => {
     component.selectTemplate('PLAN_EVAL_234');
     component.selectProject(1);
     const section = component.selectedTemplate!.sections[0];
-    component.assignFactToSection(section, component.availableReportFacts[0].id);
+    component.assignFactToSection(section, component.availableReportFacts[0].id!);
     fixture.detectChanges();
 
     const card: HTMLElement = fixture.nativeElement.querySelector('.section-assignment');
@@ -176,7 +267,7 @@ describe('AichatComponent', () => {
     component.selectProject(1);
     const fact = component.availableReportFacts[0];
     // Only PLAN_EVAL_234 has this section
-    component.assignFactToSection(component.selectedTemplate!.sections[1], fact.id);
+    component.assignFactToSection(component.selectedTemplate!.sections[1], fact.id!);
 
     expect(component.unassignedFacts).toEqual([]);
 
@@ -184,7 +275,7 @@ describe('AichatComponent', () => {
 
     expect(component.unassignedFacts).toEqual([fact]);
 
-    component.assignFactToSection(component.selectedTemplate!.sections[0], fact.id);
+    component.assignFactToSection(component.selectedTemplate!.sections[0], fact.id!);
 
     expect(component.unassignedFacts).toEqual([]);
   });
@@ -198,6 +289,31 @@ describe('AichatComponent', () => {
 
     expect(card.querySelectorAll('.query-action').length).toBe(1);
     expect(card.querySelector('.query-action')!.getAttribute('title')).toBe('Delete fact');
+  });
+
+  it('offers Save as Fact only on system answers that have query statements', () => {
+    const conversation = component.activeConversation!;
+    conversation.messages = [
+      { id: 'u', sender: 'user', text: 'q', mappable: false, purpose: 'standard', statements: ['SELECT 1'] },
+      { id: 'a', sender: 'system', text: 'no query', mappable: false, purpose: 'standard', statements: [] },
+      {
+        id: 'b',
+        sender: 'system',
+        text: 'with query',
+        mappable: false,
+        purpose: 'standard',
+        statements: ['SELECT ?s'],
+      },
+    ];
+    (component as any).refreshRenderedMessages();
+    fixture.detectChanges();
+
+    const buttons = Array.from<HTMLElement>(
+      fixture.nativeElement.querySelectorAll('.mappable-actions p-button')
+    ).filter((b) => b.textContent?.includes('Save as Fact'));
+
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].closest('.message')!.id).toBe(component.chatMessageElementId('b'));
   });
 
   it('shows facts grouped by project in the Facts tab', () => {

@@ -1,7 +1,7 @@
-import { GeoObject } from "./geoobject.model";
+import { GeoObject } from './geoobject.model';
 
 export interface ChatMessage {
-  id: string
+  id: string;
   sender: 'user' | 'system';
   text: string;
   mappable: boolean;
@@ -9,7 +9,9 @@ export interface ChatMessage {
   location?: string;
   parsedText?: string;
   loading?: boolean;
-  purpose: 'info' | 'standard'
+  purpose: 'info' | 'standard';
+  statements: string[];
+
   /**
    * Optional chain-of-thought / rationale the model produced alongside its
    * answer. When present, the UI surfaces it via a hover popup instead of
@@ -37,6 +39,7 @@ export interface ServerChatResponse {
   conversationTitle?: string;
   location?: string;
   reasoning?: string;
+  statements: string[];
 }
 
 export interface TypeSummary {
@@ -46,7 +49,7 @@ export interface TypeSummary {
 
 export interface LocationPage {
   statement: string;
-  type: string | null,
+  type: string | null;
   locations: GeoObject[];
   limit: number;
   offset: number;
@@ -75,4 +78,19 @@ export interface JobStatusResponse<T> {
   status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
   result?: T;
   errorMessage?: string;
+}
+
+export interface Fact {
+  id?: number;
+  name: string;
+  description: string;
+  text: string;
+  statements: string[];
+  projectId?: number | null;
+  projectName?: string;
+}
+
+export interface Project {
+  id?: number;
+  name: string;
 }

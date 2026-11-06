@@ -1,5 +1,7 @@
 package net.geoprism.geoai.explorer.core.dto;
 
+import java.util.List;
+
 import org.apache.commons.lang3.StringUtils;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -16,19 +18,19 @@ import lombok.NoArgsConstructor;
 @Builder
 public class FactDTO
 {
-  private Long   id;
+  private Long         id;
 
-  private String name;
+  private String       name;
 
-  private String description;
+  private String       description;
 
-  private String text;
+  private String       text;
 
-  private String statements;
+  private List<String> statements;
 
-  private Long   projectId;
+  private Long         projectId;
 
-  private String projectName;
+  private String       projectName;
 
   @JsonIgnore
   @AssertTrue(message = "projectName is required when projectId is not provided")

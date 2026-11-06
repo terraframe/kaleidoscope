@@ -24,29 +24,27 @@ import {
   faLightbulb,
   faChevronDown,
   faChevronRight,
-  faNoteSticky
+  faNoteSticky,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { ChatService } from '../service/chat-service.service';
 import { initialState, parseText } from '../state/chat.state';
-import { ChatMessage } from '../models/chat.model';
+import { ChatMessage, Fact, Project } from '../models/chat.model';
 import { ErrorService } from '../service/error-service.service';
-import {
-  ExplorerActions,
-  getWorkflowData,
-  getWorkflowStep,
-  WorkflowStep
-} from '../state/explorer.state';
+import { ExplorerActions, getWorkflowData, getWorkflowStep, WorkflowStep } from '../state/explorer.state';
 import { ExplorerService } from '../service/explorer.service';
 import { GeoObject } from '../models/geoobject.model';
 import { CachedExplorerPages, ExplorerSessionStateService } from '../service/explorer-session-state.service';
 import { ReportService } from '../service/report.service';
-import { ChatType, Fact, Project, ReportSection, ReportSelection, ReportTemplate } from '../models/report.model';
+import { ChatType, ReportSection, ReportSelection, ReportTemplate } from '../models/report.model';
 
 import { marked } from 'marked';
 
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
+import { FactService } from '../service/fact.service';
+import { ProjectService } from '../service/project.service';
 
 interface ChatConversation {
   id: string;
@@ -83,11 +81,12 @@ interface RenderedChatMessage extends ChatMessage {
     ProgressSpinnerModule,
     FontAwesomeModule,
     TooltipModule,
-    ConfirmDialogModule
+    ConfirmDialogModule,
+    DialogModule,
   ],
-  providers: [ConfirmationService],
+  providers: [ConfirmationService, FactService],
   templateUrl: './aichat.component.html',
-  styleUrl: './aichat.component.scss'
+  styleUrl: './aichat.component.scss',
 })
 export class AichatComponent {
   private readonly STORAGE_KEY = 'aichat.conversations.v1';
@@ -138,12 +137,15 @@ export class AichatComponent {
 
   public templates: ReportTemplate[] = [];
   public projects: Project[] = [];
+
+  // Current selected fact
+  fact: Fact | null = null;
+  visible: boolean = false;
   public facts: Fact[] = [];
   public factGroups: FactGroup[] = [];
   public expandedFactId: number | null = null;
   /** Names of the expanded sections in the report's Facts by section step. */
   public expandedSections = new Set<string>();
-  private onFactsChange: Subscription;
   public highlightSavedQueryId: string | null = null;
   public highlightChatMessageId: string | null = null;
   public editingSavedQueryId: string | null = null;
@@ -177,18 +179,15 @@ export class AichatComponent {
     private messageService: MessageService,
     private confirmationService: ConfirmationService,
     private explorerSessionState: ExplorerSessionStateService,
-    private reportService: ReportService
+    private reportService: ReportService,
+    private factService: FactService,
+    private projectService: ProjectService
   ) {
     this.templates = this.reportService.getTemplates();
-    this.projects = this.reportService.getProjects();
-    this.onFactsChange = this.reportService.facts$.subscribe(facts => {
-      this.facts = facts;
-      this.factGroups = this.groupFactsByProject(facts);
-    });
 
     this.savedQueries$ = this.explorerSessionState.savedQueries$;
     this.activeSidebarTab = this.loadActiveSidebarTab();
-    this.onSavedQueriesChange = this.savedQueries$.subscribe(savedQueries => {
+    this.onSavedQueriesChange = this.savedQueries$.subscribe((savedQueries) => {
       this.savedQueryIndexById = new Map(savedQueries.map((query, index) => [query.id, index + 1]));
       this.refreshRenderedMessages();
     });
@@ -196,10 +195,7 @@ export class AichatComponent {
     this.loadConversations();
     this.reconcilePendingJobs();
 
-    this.onWorkflowStepChange = combineLatest([
-      this.workflowStep$,
-      this.workflowData$
-    ]).subscribe(([step, data]) => {
+    this.onWorkflowStepChange = combineLatest([this.workflowStep$, this.workflowData$]).subscribe(([step, data]) => {
       if (step === WorkflowStep.FullScreenChat && data != null) {
         const go = data as GeoObject;
         const conversation = this.activeConversation;
@@ -217,12 +213,13 @@ export class AichatComponent {
     // Handle the case where a location link's hash is already on the URL
     // when this component is (re)constructed, e.g. a hard refresh.
     this.handleLocationHashNavigation();
+
+    this.loadProjectsAndFacts();
   }
 
   ngOnDestroy(): void {
     this.onWorkflowStepChange.unsubscribe();
     this.onSavedQueriesChange.unsubscribe();
-    this.onFactsChange.unsubscribe();
   }
 
   @HostListener('window:hashchange')
@@ -285,7 +282,7 @@ export class AichatComponent {
   }
 
   get activeConversation(): ChatConversation | undefined {
-    return this.conversations.find(c => c.id === this.activeConversationId);
+    return this.conversations.find((c) => c.id === this.activeConversationId);
   }
 
   get message(): string {
@@ -336,20 +333,23 @@ export class AichatComponent {
         return;
       }
 
-      this.conversations = conversations.map(c => ({
+      this.conversations = conversations.map((c) => ({
         id: c.id ?? uuidv4(),
         title: c.title ?? 'New chat',
         sessionId: c.sessionId ?? uuidv4(),
-        messages: Array.isArray(c.messages) ? c.messages.map(message => parseText(message)) : [],
+        // Messages saved before `statements` existed don't have it
+        messages: Array.isArray(c.messages)
+          ? c.messages.map((message) => parseText({ ...message, statements: message.statements ?? [] }))
+          : [],
         draft: c.draft ?? '',
         loading: false,
         createdAt: c.createdAt ?? Date.now(),
         type: c.type === 'report' ? 'report' : 'exploration',
-        report: c.type === 'report' ? this.normalizeReportSelection(c.report) : undefined
+        report: c.type === 'report' ? this.normalizeReportSelection(c.report) : undefined,
       }));
 
-      const hasRealChatHistory = this.conversations.some(c =>
-        c.messages.some(m => m.purpose === 'standard') || c.draft.trim().length > 0 || c.type === 'report'
+      const hasRealChatHistory = this.conversations.some(
+        (c) => c.messages.some((m) => m.purpose === 'standard') || c.draft.trim().length > 0 || c.type === 'report'
       );
 
       if (!hasRealChatHistory) {
@@ -357,11 +357,9 @@ export class AichatComponent {
         return;
       }
 
-      const activeStillExists = this.conversations.some(c => c.id === rawActiveConversationId);
+      const activeStillExists = this.conversations.some((c) => c.id === rawActiveConversationId);
 
-      this.activeConversationId = activeStillExists
-        ? rawActiveConversationId
-        : this.conversations[0].id;
+      this.activeConversationId = activeStillExists ? rawActiveConversationId : this.conversations[0].id;
 
       this.refreshRenderedMessages();
       this.saveConversations();
@@ -391,7 +389,7 @@ export class AichatComponent {
 
     const rendered = marked.parse(source, {
       breaks: true,
-      gfm: true
+      gfm: true,
     }) as string;
 
     this.markdownCache.set(source, rendered);
@@ -403,7 +401,7 @@ export class AichatComponent {
     const conversation = this.activeConversation;
 
     this.renderedMessages = conversation
-      ? [...conversation.messages].reverse().map(message => this.buildRenderedMessage(conversation, message))
+      ? [...conversation.messages].reverse().map((message) => this.buildRenderedMessage(conversation, message))
       : [];
   }
 
@@ -428,9 +426,7 @@ export class AichatComponent {
     return {
       ...message,
       renderedHtml: message.sender === 'system' ? this.renderMarkdown(parsedText) : parsedText,
-      savedQueryIndex: message.mappable
-        ? this.getSavedQueryIndexForConversation(conversation, message)
-        : null
+      savedQueryIndex: message.mappable ? this.getSavedQueryIndexForConversation(conversation, message) : null,
     };
   }
 
@@ -451,7 +447,7 @@ export class AichatComponent {
       loading: false,
       createdAt: Date.now(),
       type,
-      report: type === 'report' ? this.normalizeReportSelection(undefined) : undefined
+      report: type === 'report' ? this.normalizeReportSelection(undefined) : undefined,
     };
 
     this.conversations.unshift(conversation);
@@ -477,7 +473,7 @@ export class AichatComponent {
       draft: '',
       loading: false,
       createdAt: Date.now(),
-      type: 'exploration'
+      type: 'exploration',
     };
 
     this.conversations.unshift(conversation);
@@ -516,7 +512,7 @@ export class AichatComponent {
   deleteConversation(event: Event, id: string): void {
     event.stopPropagation();
 
-    const conversation = this.conversations.find(c => c.id === id);
+    const conversation = this.conversations.find((c) => c.id === id);
 
     if (!conversation) {
       return;
@@ -533,12 +529,12 @@ export class AichatComponent {
       rejectButtonStyleClass: 'p-button-secondary p-button-text',
       accept: () => {
         this.confirmDeleteConversation(id);
-      }
+      },
     });
   }
 
   private confirmDeleteConversation(id: string): void {
-    this.conversations = this.conversations.filter(c => c.id !== id);
+    this.conversations = this.conversations.filter((c) => c.id !== id);
 
     if (this.activeConversationId === id) {
       this.activeConversationId = this.conversations[0]?.id ?? null;
@@ -566,7 +562,7 @@ export class AichatComponent {
       return;
     }
 
-    const conversation = this.conversations.find(c => c.id === this.editingConversationId);
+    const conversation = this.conversations.find((c) => c.id === this.editingConversationId);
 
     if (!conversation) {
       this.cancelConversationTitleEdit(event);
@@ -575,9 +571,7 @@ export class AichatComponent {
 
     const trimmed = this.editingConversationTitle.trim();
 
-    conversation.title = trimmed.length > 0
-      ? trimmed
-      : this.defaultTitle(conversation);
+    conversation.title = trimmed.length > 0 ? trimmed : this.defaultTitle(conversation);
 
     this.editingConversationId = null;
     this.editingConversationTitle = '';
@@ -609,9 +603,7 @@ export class AichatComponent {
 
     const trimmed = text.trim();
 
-    conversation.title = trimmed.length > 28
-      ? trimmed.substring(0, 28) + '...'
-      : trimmed;
+    conversation.title = trimmed.length > 28 ? trimmed.substring(0, 28) + '...' : trimmed;
   }
 
   /**
@@ -638,7 +630,8 @@ export class AichatComponent {
       text,
       mappable: false,
       loading: false,
-      purpose: 'standard'
+      purpose: 'standard',
+      statements: [],
     };
 
     if (fromDraft) {
@@ -655,7 +648,8 @@ export class AichatComponent {
       text: '',
       mappable: false,
       loading: true,
-      purpose: 'standard'
+      purpose: 'standard',
+      statements: [],
     };
 
     conversation.messages.push(system);
@@ -668,29 +662,35 @@ export class AichatComponent {
     const systemMessageId = system.id;
     const sessionId = conversation.sessionId;
 
-    const request = conversation.type === 'report'
-      ? this.reportService.sendMessage(sessionId, message, conversation.report ?? this.normalizeReportSelection(undefined))
-      : this.chatService.sendMessage(sessionId, message, statusUrl => {
-        // Persist the job's status URL onto the placeholder message so that
-        // if the page is closed or reloaded before the job settles,
-        // reconcilePendingJobs() can resume polling it (or fail it cleanly)
-        // on the next boot instead of leaving a permanent busy spinner.
-        system.pendingStatusUrl = statusUrl;
-        this.saveConversations();
-      });
+    const request =
+      conversation.type === 'report'
+        ? this.reportService.sendMessage(
+            sessionId,
+            message,
+            conversation.report ?? this.normalizeReportSelection(undefined),
+            this.selectedProject,
+            this.selectedFacts
+          )
+        : this.chatService.sendMessage(sessionId, message, (statusUrl) => {
+            // Persist the job's status URL onto the placeholder message so that
+            // if the page is closed or reloaded before the job settles,
+            // reconcilePendingJobs() can resume polling it (or fail it cleanly)
+            // on the next boot instead of leaving a permanent busy spinner.
+            system.pendingStatusUrl = statusUrl;
+            this.saveConversations();
+          });
 
     request
-      .then(response => {
-        const targetConversation = this.conversations.find(c => c.id === conversationId);
+      .then((response) => {
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
 
         if (!targetConversation) {
           return;
         }
 
-        const index = targetConversation.messages.findIndex(m => m.id === systemMessageId);
+        const index = targetConversation.messages.findIndex((m) => m.id === systemMessageId);
 
         if (index !== -1) {
-
           targetConversation.messages[index] = parseText({
             ...system,
             text: response.text,
@@ -699,23 +699,24 @@ export class AichatComponent {
             loading: false,
             location: response.location,
             reasoning: response.reasoning,
-            pendingStatusUrl: undefined
+            statements: response.statements ?? [],
+            pendingStatusUrl: undefined,
           });
 
           this.refreshRenderedMessages();
           this.saveConversations();
         }
       })
-      .catch(error => {
+      .catch((error) => {
         this.errorService.handleError(error);
 
-        const targetConversation = this.conversations.find(c => c.id === conversationId);
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
 
         if (!targetConversation) {
           return;
         }
 
-        const index = targetConversation.messages.findIndex(m => m.id === systemMessageId);
+        const index = targetConversation.messages.findIndex((m) => m.id === systemMessageId);
 
         if (index !== -1) {
           targetConversation.messages[index] = {
@@ -723,7 +724,7 @@ export class AichatComponent {
             text: 'An error occurred',
             loading: false,
             purpose: 'info',
-            pendingStatusUrl: undefined
+            pendingStatusUrl: undefined,
           };
 
           this.refreshRenderedMessages();
@@ -731,7 +732,7 @@ export class AichatComponent {
         }
       })
       .finally(() => {
-        const targetConversation = this.conversations.find(c => c.id === conversationId);
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
 
         if (targetConversation) {
           targetConversation.loading = false;
@@ -766,7 +767,7 @@ export class AichatComponent {
     let hadUnresolvableStuckMessage = false;
 
     for (const conversation of this.conversations) {
-      const stuckMessage = conversation.messages.find(m => m.loading);
+      const stuckMessage = conversation.messages.find((m) => m.loading);
 
       if (!stuckMessage) {
         continue;
@@ -791,15 +792,16 @@ export class AichatComponent {
     conversation.loading = true;
     this.refreshRenderedMessages();
 
-    this.chatService.resumePrompt(statusUrl)
-      .then(response => {
-        const index = conversation.messages.findIndex(m => m.id === message.id);
+    this.chatService
+      .resumePrompt(statusUrl)
+      .then((response) => {
+        const index = conversation.messages.findIndex((m) => m.id === message.id);
 
         if (index !== -1) {
           conversation.messages[index] = parseText({ ...response, id: message.id });
         }
       })
-      .catch(error => {
+      .catch((error) => {
         // The job either explicitly failed, the server no longer
         // recognizes it (most likely it restarted while this message was
         // pending), or it didn't finish within the polling deadline -- in
@@ -815,7 +817,7 @@ export class AichatComponent {
   }
 
   private failStuckMessage(conversation: ChatConversation, message: ChatMessage): void {
-    const index = conversation.messages.findIndex(m => m.id === message.id);
+    const index = conversation.messages.findIndex((m) => m.id === message.id);
 
     if (index === -1) {
       return;
@@ -826,7 +828,7 @@ export class AichatComponent {
       text: 'This request was interrupted and could not be completed. Please try again.',
       loading: false,
       purpose: 'info',
-      pendingStatusUrl: undefined
+      pendingStatusUrl: undefined,
     };
   }
 
@@ -845,12 +847,14 @@ export class AichatComponent {
   }
 
   viewCachedQuery(query: CachedExplorerPages): void {
-    this.store.dispatch(ExplorerActions.showPagesOnMap({
-      pages: query.pages,
-      zoomMap: true,
-      step: WorkflowStep.MapAndResults,
-      data: { pageCacheId: query.id }
-    }));
+    this.store.dispatch(
+      ExplorerActions.showPagesOnMap({
+        pages: query.pages,
+        zoomMap: true,
+        step: WorkflowStep.MapAndResults,
+        data: { pageCacheId: query.id },
+      })
+    );
   }
 
   openSavedQueryChat(query: CachedExplorerPages): void {
@@ -918,7 +922,7 @@ export class AichatComponent {
       rejectButtonStyleClass: 'p-button-secondary p-button-text',
       accept: () => {
         this.explorerSessionState.deleteCachedPages(query.id);
-      }
+      },
     });
   }
 
@@ -935,9 +939,7 @@ export class AichatComponent {
   getMessageQueryId(message: ChatMessage): string | null {
     const history = this.getMappableHistory(message);
 
-    return history
-      ? this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100)
-      : null;
+    return history ? this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100) : null;
   }
 
   private getSavedQueryIndexForConversation(conversation: ChatConversation, message: ChatMessage): number | null {
@@ -984,15 +986,16 @@ export class AichatComponent {
 
     this.mapLoading = true;
 
-    this.chatService.getLocations(history, 0, 100)
-      .then(pages => {
+    this.chatService
+      .getLocations(history, 0, 100)
+      .then((pages) => {
         if (!this.explorerSessionState.hasResults(pages)) {
           this.messageService.add({
             key: 'explorer',
             severity: 'info',
             summary: 'Info',
             detail: 'The query did not return any results!',
-            sticky: true
+            sticky: true,
           });
           return;
         }
@@ -1000,7 +1003,7 @@ export class AichatComponent {
         this.explorerSessionState.saveCachedPages(queryId);
         this.scrollToSavedQuery(queryId);
       })
-      .catch(error => this.errorService.handleError(error))
+      .catch((error) => this.errorService.handleError(error))
       .finally(() => {
         this.mapLoading = false;
       });
@@ -1049,9 +1052,11 @@ export class AichatComponent {
     return `chat-message-${messageId}`;
   }
 
-  private findMappableMessageForQueryId(queryId: string): { conversation: ChatConversation; message: ChatMessage } | null {
+  private findMappableMessageForQueryId(
+    queryId: string
+  ): { conversation: ChatConversation; message: ChatMessage } | null {
     for (const conversation of this.conversations) {
-      const mappableMessages = conversation.messages.filter(message => message.mappable);
+      const mappableMessages = conversation.messages.filter((message) => message.mappable);
 
       for (const message of mappableMessages) {
         const history = this.getMappableHistoryForConversation(conversation, message);
@@ -1081,17 +1086,17 @@ export class AichatComponent {
     return this.getMappableHistoryForConversation(conversation, message);
   }
 
-  private getMappableHistoryForConversation(conversation: ChatConversation, message: ChatMessage): ChatMessage[] | null {
-
-    const index = conversation.messages.findIndex(m => m.id === message.id);
+  private getMappableHistoryForConversation(
+    conversation: ChatConversation,
+    message: ChatMessage
+  ): ChatMessage[] | null {
+    const index = conversation.messages.findIndex((m) => m.id === message.id);
 
     if (index === -1) {
       return null;
     }
 
-    return conversation.messages
-      .slice(0, index + 1)
-      .filter(m => m.purpose === 'standard');
+    return conversation.messages.slice(0, index + 1).filter((m) => m.purpose === 'standard');
   }
 
   mapIt(message: ChatMessage): void {
@@ -1109,9 +1114,10 @@ export class AichatComponent {
 
     this.mapLoading = true;
 
-    this.chatService.getLocations(history, 0, 100)
-      .then(pages => {
-        let total = pages.map(p => p.count).reduce((a,b) => a+b, 0);
+    this.chatService
+      .getLocations(history, 0, 100)
+      .then((pages) => {
+        let total = pages.map((p) => p.count).reduce((a, b) => a + b, 0);
 
         if (total === 0) {
           this.messageService.add({
@@ -1119,25 +1125,25 @@ export class AichatComponent {
             severity: 'info',
             summary: 'Info',
             detail: 'The query did not return any results!',
-            sticky: true
+            sticky: true,
           });
           return;
         }
 
-        const step = message.ambiguous
-          ? WorkflowStep.DisambiguateObject
-          : WorkflowStep.MapAndResults;
+        const step = message.ambiguous ? WorkflowStep.DisambiguateObject : WorkflowStep.MapAndResults;
 
         const pageCacheId = this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100);
 
-        this.store.dispatch(ExplorerActions.showPagesOnMap({
-          pages,
-          zoomMap: true,
-          step,
-          data: { pageCacheId }
-        }));
+        this.store.dispatch(
+          ExplorerActions.showPagesOnMap({
+            pages,
+            zoomMap: true,
+            step,
+            data: { pageCacheId },
+          })
+        );
       })
-      .catch(error => this.errorService.handleError(error))
+      .catch((error) => this.errorService.handleError(error))
       .finally(() => {
         this.mapLoading = false;
       });
@@ -1146,19 +1152,24 @@ export class AichatComponent {
   setWorkflowStepDisambiguate(message: ChatMessage): void {
     this.mapLoading = true;
 
-    this.explorerService.fullTextLookup(message.location!)
-      .then(page => {
+    this.explorerService
+      .fullTextLookup(message.location!)
+      .then((page) => {
         const pageCacheId = this.explorerSessionState.getOrCreateFullTextLookupId(message.location!);
         this.explorerSessionState.cachePages([page], 'full-text-disambiguation', pageCacheId, message.location);
 
-        this.store.dispatch(ExplorerActions.setPages({
-          pages: [page],
-          zoomMap: true
-        }));
+        this.store.dispatch(
+          ExplorerActions.setPages({
+            pages: [page],
+            zoomMap: true,
+          })
+        );
 
-        this.store.dispatch(ExplorerActions.setWorkflowStep({ step: WorkflowStep.DisambiguateObject, data: { pageCacheId } }));
+        this.store.dispatch(
+          ExplorerActions.setWorkflowStep({ step: WorkflowStep.DisambiguateObject, data: { pageCacheId } })
+        );
       })
-      .catch(error => this.errorService.handleError(error))
+      .catch((error) => this.errorService.handleError(error))
       .finally(() => {
         this.mapLoading = false;
       });
@@ -1167,17 +1178,21 @@ export class AichatComponent {
   clear(): void {
     const conversation = this.activeConversation;
 
-    this.store.dispatch(ExplorerActions.setPages({
-      pages: [{
-        locations: [],
-        statement: '',
-        type: null,
-        limit: 100,
-        offset: 0,
-        count: 0
-      }],
-      zoomMap: false
-    }));
+    this.store.dispatch(
+      ExplorerActions.setPages({
+        pages: [
+          {
+            locations: [],
+            statement: '',
+            type: null,
+            limit: 100,
+            offset: 0,
+            count: 0,
+          },
+        ],
+        zoomMap: false,
+      })
+    );
 
     if (conversation) {
       conversation.messages = [];
@@ -1220,15 +1235,18 @@ export class AichatComponent {
   private inspectLocationUri(uri: string): void {
     this.mapLoading = true;
 
-    this.explorerService.getAttributes(uri, true)
-      .then(geoObject => {
-        this.store.dispatch(ExplorerActions.setWorkflowStep({
-          step: WorkflowStep.InspectObject,
-          data: geoObject,
-          zoomMap: true
-        }));
+    this.explorerService
+      .getAttributes(uri, true)
+      .then((geoObject) => {
+        this.store.dispatch(
+          ExplorerActions.setWorkflowStep({
+            step: WorkflowStep.InspectObject,
+            data: geoObject,
+            zoomMap: true,
+          })
+        );
       })
-      .catch(error => this.errorService.handleError(error))
+      .catch((error) => this.errorService.handleError(error))
       .finally(() => {
         this.mapLoading = false;
       });
@@ -1251,20 +1269,22 @@ export class AichatComponent {
   }
 
   get selectedProject(): Project | undefined {
-    return this.reportService.getProject(this.activeReport?.projectId);
+    const projectId = this.activeReport?.projectId;
+
+    return projectId == null ? undefined : this.projects.find((p) => p.id === projectId);
   }
 
   /** Facts that can be picked for the active report: those in its project. */
   get availableReportFacts(): Fact[] {
     const projectId = this.activeReport?.projectId;
 
-    return projectId == null ? [] : this.facts.filter(f => f.projectId === projectId);
+    return projectId == null ? [] : this.facts.filter((f) => f.projectId === projectId);
   }
 
   get selectedFacts(): Fact[] {
     const ids = this.activeReport?.factIds ?? [];
 
-    return this.facts.filter(f => ids.includes(f.id));
+    return this.facts.filter((f) => f.id != null && ids.includes(f.id));
   }
 
   get messagePlaceholder(): string {
@@ -1283,7 +1303,7 @@ export class AichatComponent {
       projectId: selection?.projectId ?? null,
       factIds: Array.isArray(selection?.factIds) ? [...selection!.factIds] : [],
       sectionFacts: { ...(selection?.sectionFacts ?? {}) },
-      sectionNotes: { ...(selection?.sectionNotes ?? {}) }
+      sectionNotes: { ...(selection?.sectionNotes ?? {}) },
     };
   }
 
@@ -1308,7 +1328,7 @@ export class AichatComponent {
 
     // Keep assignments to sections the new template shares by name. Facts in
     // the other sections stay in the report, unassigned.
-    const sectionNames = new Set(this.selectedTemplate?.sections.map(s => s.name) ?? []);
+    const sectionNames = new Set(this.selectedTemplate?.sections.map((s) => s.name) ?? []);
     report.sectionFacts = Object.fromEntries(
       Object.entries(report.sectionFacts).filter(([name]) => sectionNames.has(name))
     );
@@ -1337,7 +1357,7 @@ export class AichatComponent {
   removeFactFromReport(fact: Fact): void {
     const report = this.activeReport;
 
-    if (!report) {
+    if (!report || fact.id == null) {
       return;
     }
 
@@ -1346,24 +1366,24 @@ export class AichatComponent {
   }
 
   private removeFactFromSelection(report: ReportSelection, factId: number): void {
-    report.factIds = report.factIds.filter(id => id !== factId);
+    report.factIds = report.factIds.filter((id) => id !== factId);
 
     for (const name of Object.keys(report.sectionFacts)) {
-      report.sectionFacts[name] = report.sectionFacts[name].filter(id => id !== factId);
+      report.sectionFacts[name] = report.sectionFacts[name].filter((id) => id !== factId);
     }
   }
 
   factsInSection(section: ReportSection): Fact[] {
     const ids = this.activeReport?.sectionFacts[section.name] ?? [];
 
-    return ids.map(id => this.facts.find(f => f.id === id)).filter((f): f is Fact => f != null);
+    return ids.map((id) => this.facts.find((f) => f.id === id)).filter((f): f is Fact => f != null);
   }
 
   /** Project facts that can still be added to a section. */
   factsAssignableToSection(section: ReportSection): Fact[] {
     const ids = this.activeReport?.sectionFacts[section.name] ?? [];
 
-    return this.availableReportFacts.filter(f => !ids.includes(f.id));
+    return this.availableReportFacts.filter((f) => f.id != null && !ids.includes(f.id));
   }
 
   /** Facts in the report that aren't assigned to any section of the template. */
@@ -1375,19 +1395,17 @@ export class AichatComponent {
       return [];
     }
 
-    const assigned = new Set(
-      (template?.sections ?? []).flatMap(s => report.sectionFacts[s.name] ?? [])
-    );
+    const assigned = new Set((template?.sections ?? []).flatMap((s) => report.sectionFacts[s.name] ?? []));
 
-    return this.selectedFacts.filter(f => !assigned.has(f.id));
+    return this.selectedFacts.filter((f) => f.id != null && !assigned.has(f.id));
   }
 
   get requiredSectionCoverage(): { covered: number; total: number } {
-    const required = this.selectedTemplate?.sections.filter(s => s.required) ?? [];
+    const required = this.selectedTemplate?.sections.filter((s) => s.required) ?? [];
 
     return {
-      covered: required.filter(s => this.sectionHasContent(s)).length,
-      total: required.length
+      covered: required.filter((s) => this.sectionHasContent(s)).length,
+      total: required.length,
     };
   }
 
@@ -1395,8 +1413,10 @@ export class AichatComponent {
   sectionHasContent(section: ReportSection): boolean {
     const report = this.activeReport;
 
-    return (report?.sectionFacts[section.name]?.length ?? 0) > 0
-      || (report?.sectionNotes[section.name]?.trim().length ?? 0) > 0;
+    return (
+      (report?.sectionFacts[section.name]?.length ?? 0) > 0 ||
+      (report?.sectionNotes[section.name]?.trim().length ?? 0) > 0
+    );
   }
 
   isSectionExpanded(section: ReportSection): boolean {
@@ -1482,28 +1502,33 @@ export class AichatComponent {
   /**
    * Takes a fact out of one section. A fact that ends up in no section leaves
    * the report, so the report's facts are always the ones placed somewhere
-   * (apart from those added from the Facts tab that haven't been placed yet).
+   * (apart from those left over when a template change drops their section).
    */
   unassignFactFromSection(section: ReportSection, fact: Fact): void {
     const report = this.activeReport;
+    const factId = fact.id;
 
-    if (!report) {
+    if (!report || factId == null) {
       return;
     }
 
-    report.sectionFacts[section.name] = (report.sectionFacts[section.name] ?? []).filter(id => id !== fact.id);
+    report.sectionFacts[section.name] = (report.sectionFacts[section.name] ?? []).filter((id) => id !== factId);
 
-    const stillAssigned = Object.values(report.sectionFacts).some(ids => ids.includes(fact.id));
+    const stillAssigned = Object.values(report.sectionFacts).some((ids) => ids.includes(factId));
 
     if (!stillAssigned) {
-      report.factIds = report.factIds.filter(id => id !== fact.id);
+      report.factIds = report.factIds.filter((id) => id !== factId);
     }
 
     this.saveConversations();
   }
 
   toggleFactDetails(fact: Fact): void {
-    this.expandedFactId = this.expandedFactId === fact.id ? null : fact.id;
+    this.expandedFactId = this.expandedFactId === fact.id ? null : (fact.id ?? null);
+  }
+
+  factStatements(fact: Fact): string {
+    return (fact.statements ?? []).join('\n\n');
   }
 
   deleteFact(event: Event, fact: Fact): void {
@@ -1519,16 +1544,28 @@ export class AichatComponent {
       acceptButtonStyleClass: 'p-button-danger',
       rejectButtonStyleClass: 'p-button-secondary p-button-text',
       accept: () => {
-        this.reportService.deleteFact(fact.id);
+        const id = fact.id;
 
-        for (const conversation of this.conversations) {
-          if (conversation.report) {
-            this.removeFactFromSelection(conversation.report, fact.id);
-          }
+        if (id == null) {
+          return;
         }
 
-        this.saveConversations();
-      }
+        this.factService
+          .delete(id)
+          .then(() => {
+            this.facts = this.facts.filter((f) => f.id !== id);
+            this.factGroups = this.groupFactsByProject(this.facts);
+
+            for (const conversation of this.conversations) {
+              if (conversation.report) {
+                this.removeFactFromSelection(conversation.report, id);
+              }
+            }
+
+            this.saveConversations();
+          })
+          .catch((error) => this.errorService.handleError(error));
+      },
     });
   }
 
@@ -1536,16 +1573,75 @@ export class AichatComponent {
     const groups = new Map<number, FactGroup>();
 
     for (const fact of facts) {
-      let group = groups.get(fact.projectId);
+      const projectId = fact.projectId ?? -1;
+      let group = groups.get(projectId);
 
       if (!group) {
-        group = { projectId: fact.projectId, projectName: fact.projectName, facts: [] };
-        groups.set(fact.projectId, group);
+        group = { projectId, projectName: fact.projectName ?? '', facts: [] };
+        groups.set(projectId, group);
       }
 
       group.facts.push(fact);
     }
 
     return [...groups.values()];
+  }
+
+  createFact(event: Event, message: ChatMessage): void {
+    event.stopPropagation();
+
+    this.fact = {
+      name: '',
+      description: '',
+      projectId: this.projects.length > 0 ? this.projects[0].id : null,
+      projectName: '',
+      statements: message.statements,
+      text: message.text,
+    };
+
+    this.visible = true;
+  }
+
+  saveFact(): void {
+    if (this.fact != null) {
+      this.factService
+        .save(this.fact)
+        .then(() => {
+          this.fact = null;
+          this.visible = false;
+
+          this.loadProjectsAndFacts();
+        })
+        .catch((error) => this.errorService.handleError(error));
+    }
+  }
+
+  /**
+   * Loads the projects and every project's facts. Both the report wizard and
+   * the Facts tab use these; the Save as Fact dialog uses the projects.
+   */
+  loadProjectsAndFacts(): Promise<void> {
+    return this.projectService
+      .getAll()
+      .then((projects) => {
+        this.projects = projects;
+
+        return Promise.all(
+          projects
+            .filter((p) => p.id != null)
+            .map((p) =>
+              this.factService
+                .getByProject(p.id!)
+                .then((facts) =>
+                  facts.map((f) => ({ ...f, projectId: f.projectId ?? p.id, projectName: f.projectName ?? p.name }))
+                )
+            )
+        );
+      })
+      .then((factsByProject) => {
+        this.facts = factsByProject.flat();
+        this.factGroups = this.groupFactsByProject(this.facts);
+      })
+      .catch((error) => this.errorService.handleError(error));
   }
 }

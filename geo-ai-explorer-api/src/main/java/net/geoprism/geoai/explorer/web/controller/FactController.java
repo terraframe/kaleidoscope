@@ -20,7 +20,7 @@ import net.geoprism.geoai.explorer.core.service.FactService;
 
 @RestController
 @Validated
-@RequestMapping("/api/fact")
+@RequestMapping("/api/")
 public class FactController
 {
   @Autowired
