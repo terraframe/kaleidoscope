@@ -308,4 +308,47 @@ public class ChatService
 
     return mustQuote ? "\"" + text + "\"" : text;
   }
+  
+  public String report(String sessionId, String inputText)
+  {
+    RetryPolicy<String> retryPolicy = RetryPolicy.<String>builder()
+        .handle(Exception.class)
+        .withMaxAttempts(3)
+        .withDelay(Duration.ofMillis(250))
+        .onFailedAttempt(event -> {
+          Throwable failure = event.getLastException();
+
+          if (failure instanceof UnableToAssistResponseException)
+          {
+            log.warn(
+                "Chat prompt attempt {} returned an unable-to-assist response. Retrying.",
+                event.getAttemptCount()
+            );
+          }
+          else
+          {
+            log.warn(
+                "Chat prompt attempt {} failed with exception.",
+                event.getAttemptCount(),
+                failure
+            );
+          }
+        })
+        .build();
+
+    try
+    {
+      return Failsafe.with(retryPolicy).get(() -> {
+        return this.bedrock.report(sessionId, inputText);
+      });
+    }
+    catch (Exception e)
+    {
+      log.error("Error invoking a remote service after retries: ", e);
+
+      throw new GenericRestException("The report agent was unable to generate a response. If your chat history is not relevant to the current request, you can try clearing your chat history and sending your message again.", e);
+    }
+  }
+
+
 }
