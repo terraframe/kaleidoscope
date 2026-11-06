@@ -2,7 +2,7 @@
   <p-confirmDialog appendTo="body"></p-confirmDialog>
 
   <p-dialog
-    header="Save Fact"
+    [header]="fact?.id != null ? 'Edit Fact' : 'Save Fact'"
     [(visible)]="visible"
     [modal]="true"
     [draggable]="false"
@@ -13,23 +13,8 @@
     <form #factForm="ngForm">
       @if (fact != null) {
         <div class="save-fact-form">
-          <label for="save-fact-project">Project</label>
-          <select id="save-fact-project" [(ngModel)]="fact.projectId" name="projectId">
-            <option [ngValue]="null">Create new Project...</option>
-            @for (project of projects; track project.id) {
-              <option [ngValue]="project.id">{{ project.name }}</option>
-            }
-          </select>
-          @if (fact.projectId == null) {
-            <label for="save-fact-project-name">Project Name</label>
-            <input
-              id="save-fact-project-name"
-              type="text"
-              [(ngModel)]="fact.projectName"
-              name="projectName"
-              autocomplete="off"
-              required
-            />
+          @if (fact.text) {
+            <blockquote class="save-fact-quote markdown-content" [innerHTML]="factTextHtml"></blockquote>
           }
           <label for="save-fact-name">Name</label>
           <input id="save-fact-name" type="text" [(ngModel)]="fact.name" name="name" autocomplete="off" required />
@@ -46,9 +31,49 @@
       }
     </form>
     <ng-template #footer>
-      <p-button severity="secondary" label="Cancel" (onClick)="visible = false"> </p-button>
-
-      <p-button label="Save" [disabled]="!factForm.valid" (onClick)="saveFact()"> </p-button>
+      <div class="save-fact-footer">
+        @if (fact?.id == null) {
+          <div class="save-fact-destination">
+            <label for="save-fact-project">Save to</label>
+            <p-autocomplete
+              inputId="save-fact-project"
+              [(ngModel)]="factProjectChoice"
+              [suggestions]="factProjectSuggestions"
+              (completeMethod)="searchFactProjects($event.query)"
+              optionLabel="name"
+              [dropdown]="true"
+              [completeOnFocus]="true"
+              placeholder="Pick a project or name a new one"
+              appendTo="body"
+              styleClass="save-fact-project"
+            >
+              <ng-template #item let-option>
+                @if (option.id == null) {
+                  <span class="new-project-option">+ Create project “{{ option.name }}”</span>
+                } @else {
+                  {{ option.name }}
+                }
+              </ng-template>
+            </p-autocomplete>
+          </div>
+        } @else if (fact?.projectName) {
+          <div class="save-fact-destination">
+            <span class="save-fact-in-project">In {{ fact?.projectName }}</span>
+          </div>
+        }
+        <div class="save-fact-actions">
+          @if (factCreatesProject) {
+            <span class="new-project-badge">New project</span>
+          }
+          <p-button severity="secondary" label="Cancel" (onClick)="visible = false"> </p-button>
+          <p-button
+            [label]="factCreatesProject ? 'Create project & save' : 'Save'"
+            [disabled]="!factForm.valid || (fact?.id == null && factProject == null)"
+            (onClick)="saveFact()"
+          >
+          </p-button>
+        </div>
+      </div>
     </ng-template>
   </p-dialog>
 
@@ -275,6 +300,9 @@
                     </div>
                   }
                   <span class="query-actions">
+                    <span class="query-action" title="Edit fact" (click)="editFact($event, fact)">
+                      <fa-icon [icon]="edit"></fa-icon>
+                    </span>
                     <span class="query-action" title="Delete fact" (click)="deleteFact($event, fact)">
                       <fa-icon [icon]="deleteQueryIcon"></fa-icon>
                     </span>
@@ -334,19 +362,9 @@
                     (keydown.space)="selectTemplate(template.id); $event.preventDefault()"
                   >
                     <span class="template-name">{{ template.name }}</span>
-                    @if (template.regulation) {
-                      <span class="template-regulation" [title]="template.regulation">
-                        @if (template.regulationUrl) {
-                          <a
-                            [href]="template.regulationUrl"
-                            target="_blank"
-                            rel="noopener"
-                            (click)="$event.stopPropagation()"
-                            >{{ template.regulation }}</a
-                          >
-                        } @else {
-                          {{ template.regulation }}
-                        }
+                    @if (template.description) {
+                      <span class="template-description" [title]="template.description">
+                        {{ template.description }}
                       </span>
                     }
                   </div>
@@ -519,9 +537,7 @@
                   {{ requiredSectionCoverage.total - requiredSectionCoverage.covered }} required section{{
                     requiredSectionCoverage.total - requiredSectionCoverage.covered === 1 ? '' : 's'
                   }}
-                  still need{{
-                    requiredSectionCoverage.total - requiredSectionCoverage.covered === 1 ? 's' : ''
-                  }}
+                  still need{{ requiredSectionCoverage.total - requiredSectionCoverage.covered === 1 ? 's' : '' }}
                   content. The agent will ask how to handle them.
                 </span>
               }

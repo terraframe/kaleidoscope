@@ -12,12 +12,30 @@ export interface ReportSection {
   required: boolean;
 }
 
+/**
+ * Mirrors net.geoprism.geoai.explorer.core.model.Reference: a statute,
+ * regulation or guidance document that governs a template. (The server keeps
+ * each reference's maintainer notes to itself.)
+ */
+export interface Reference {
+  citation: string;
+  title: string;
+  url: string | null;
+  /** What the document governs, e.g. "report-format". Free text. */
+  role: string;
+  /** The parts of the document that apply; empty when all of it does. */
+  provisions: string[];
+  /** What the document requires of the report. */
+  summary: string;
+}
+
 /** Mirrors net.geoprism.geoai.explorer.core.model.ReportTemplate. */
 export interface ReportTemplate {
   id: string;
   name: string;
-  regulation?: string;
-  regulationUrl?: string;
+  /** What the template covers, shown on its card. */
+  description?: string;
+  references: Reference[];
   sections: ReportSection[];
 }
 

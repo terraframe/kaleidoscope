@@ -106,6 +106,80 @@ describe('AichatComponent', () => {
     expect(component.factsInSection(section)).toEqual([]);
   });
 
+  describe('Save to', () => {
+    const message = { text: 'About 42,180 people.', statements: ['SELECT 1'] } as any;
+
+    const saveRequestBody = () => {
+      component.fact!.name = 'Population';
+      component.fact!.description = 'People in the floodplain.';
+      component.saveFact();
+      const req = http.expectOne(apiBase() + 'api/facts');
+      return req.request.body;
+    };
+
+    it('defaults to the first project and saves the fact to it', () => {
+      component.createFact(new Event('click'), message);
+
+      expect(component.factProject).toEqual({ id: 1, name: 'Upper Guadalupe River GRR' });
+      expect(component.factCreatesProject).toBeFalse();
+      expect(saveRequestBody()).toEqual(jasmine.objectContaining({ projectId: 1, projectName: '' }));
+    });
+
+    it('offers to create a project only when no project has the typed name', () => {
+      component.searchFactProjects('levee');
+      expect(component.factProjectSuggestions).toEqual([
+        { id: 2, name: 'Lower Mississippi Levee Assessment' },
+        { id: null, name: 'levee' },
+      ]);
+
+      component.searchFactProjects('upper guadalupe river grr');
+      expect(component.factProjectSuggestions).toEqual([{ id: 1, name: 'Upper Guadalupe River GRR' }]);
+    });
+
+    it('creates a project from a typed name that matches none', () => {
+      component.createFact(new Event('click'), message);
+      component.factProjectChoice = '  Kerr Dam ';
+
+      expect(component.factCreatesProject).toBeTrue();
+      expect(saveRequestBody()).toEqual(jasmine.objectContaining({ projectId: null, projectName: 'Kerr Dam' }));
+    });
+
+    it('uses the existing project when the typed name matches one', () => {
+      component.createFact(new Event('click'), message);
+      component.factProjectChoice = 'lower mississippi levee assessment';
+
+      expect(component.factCreatesProject).toBeFalse();
+      expect(saveRequestBody()).toEqual(jasmine.objectContaining({ projectId: 2, projectName: '' }));
+    });
+
+    it('does not save without a project', () => {
+      component.createFact(new Event('click'), message);
+      component.factProjectChoice = '  ';
+
+      component.saveFact();
+      http.expectNone(apiBase() + 'api/facts');
+    });
+  });
+
+  it('edits a fact name and description without changing its query', async () => {
+    const original = component.facts[0];
+    component.editFact(new Event('click'), original);
+
+    expect(component.visible).toBeTrue();
+    component.fact!.name = 'Renamed';
+    component.fact!.description = 'New description';
+    expect(original.name).not.toBe('Renamed');
+
+    component.saveFact();
+    const req = http.expectOne(apiBase() + 'api/facts');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ ...original, name: 'Renamed', description: 'New description' });
+    req.flush(req.request.body);
+    await settle();
+
+    expect(component.visible).toBeFalse();
+  });
+
   it('should create', () => {
     expect(component).toBeTruthy();
   });
@@ -287,8 +361,8 @@ describe('AichatComponent', () => {
 
     const card: HTMLElement = fixture.nativeElement.querySelector('.fact-card');
 
-    expect(card.querySelectorAll('.query-action').length).toBe(1);
-    expect(card.querySelector('.query-action')!.getAttribute('title')).toBe('Delete fact');
+    const titles = Array.from(card.querySelectorAll('.query-action')).map((a) => a.getAttribute('title'));
+    expect(titles).toEqual(['Edit fact', 'Delete fact']);
   });
 
   it('offers Save as Fact only on system answers that have query statements', () => {
@@ -314,6 +388,21 @@ describe('AichatComponent', () => {
 
     expect(buttons.length).toBe(1);
     expect(buttons[0].closest('.message')!.id).toBe(component.chatMessageElementId('b'));
+  });
+
+  it('shows each template description on its card, with no links to click by mistake', () => {
+    component.newConversation(true, 'report');
+    fixture.detectChanges();
+
+    const cards = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.template-option'));
+
+    expect(cards.length).toBe(component.templates.length);
+    cards.forEach((card, i) => {
+      expect(card.querySelector('.template-description')!.textContent!.trim()).toBe(
+        component.templates[i].description!
+      );
+      expect(card.querySelector('a')).toBeNull();
+    });
   });
 
   it('shows facts grouped by project in the Facts tab', () => {

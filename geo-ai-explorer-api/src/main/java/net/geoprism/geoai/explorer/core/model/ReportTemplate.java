@@ -21,16 +21,18 @@ public class ReportTemplate
   private String        name;
 
   /**
-   * Citation of the federal regulation (or agency guidance) that defines the
-   * requirements this template's sections satisfy, e.g. "33 CFR Part 234,
-   * §234.9 Evaluate effects of alternatives".
+   * One or two sentences on what the template covers, shown to people
+   * choosing a template.
    */
-  private String        regulation;
+  private String        description;
 
   /**
-   * Link to the authoritative text of {@link #regulation}.
+   * The statutes, regulations and agency guidance that define what this
+   * template's sections ask for. Usually several documents, each governing a
+   * different aspect of the report (see {@link Reference#getRole()}).
    */
-  private String        regulationUrl;
+  @Builder.Default
+  private List<Reference> references = new LinkedList<>();
 
   @Builder.Default
   private List<Section> sections = new LinkedList<>();

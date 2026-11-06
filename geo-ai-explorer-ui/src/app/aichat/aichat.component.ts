@@ -43,6 +43,7 @@ import { marked } from 'marked';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
+import { AutoCompleteModule } from 'primeng/autocomplete';
 import { FactService } from '../service/fact.service';
 import { ProjectService } from '../service/project.service';
 
@@ -67,6 +68,12 @@ interface FactGroup {
   facts: Fact[];
 }
 
+/** Where the fact dialog will save a fact. `id` is null for a project the save will create. */
+interface ProjectChoice {
+  id: number | null;
+  name: string;
+}
+
 interface RenderedChatMessage extends ChatMessage {
   renderedHtml: string;
   savedQueryIndex: number | null;
@@ -83,6 +90,7 @@ interface RenderedChatMessage extends ChatMessage {
     TooltipModule,
     ConfirmDialogModule,
     DialogModule,
+    AutoCompleteModule,
   ],
   providers: [ConfirmationService, FactService],
   templateUrl: './aichat.component.html',
@@ -141,6 +149,9 @@ export class AichatComponent {
   // Current selected fact
   fact: Fact | null = null;
   visible: boolean = false;
+  /** The fact dialog's "Save to" box: a picked project, or the text typed into it. */
+  factProjectChoice: ProjectChoice | string | null = null;
+  factProjectSuggestions: ProjectChoice[] = [];
   public facts: Fact[] = [];
   public factGroups: FactGroup[] = [];
   public expandedFactId: number | null = null;
@@ -1593,16 +1604,83 @@ export class AichatComponent {
     this.fact = {
       name: '',
       description: '',
-      projectId: this.projects.length > 0 ? this.projects[0].id : null,
+      projectId: null,
       projectName: '',
       statements: message.statements,
       text: message.text,
     };
 
+    const first = this.projects.find((p) => p.id != null);
+    this.factProjectChoice = first ? { id: first.id!, name: first.name } : null;
+    this.visible = true;
+  }
+
+  /** The answer the fact dialog's fact was saved from, as HTML. */
+  get factTextHtml(): string {
+    return this.renderMarkdown(this.fact?.text);
+  }
+
+  /**
+   * Fills the "Save to" suggestions: the projects whose names contain the
+   * query, plus an option to create a project with that name if none has it.
+   */
+  searchFactProjects(query: string): void {
+    const name = query.trim();
+    const lower = name.toLowerCase();
+    const matches: ProjectChoice[] = this.projects
+      .filter((p) => p.id != null && p.name.toLowerCase().includes(lower))
+      .map((p) => ({ id: p.id!, name: p.name }));
+    const exists = this.projects.some((p) => p.name.toLowerCase() === lower);
+
+    this.factProjectSuggestions = name && !exists ? [...matches, { id: null, name }] : matches;
+  }
+
+  /**
+   * The project the fact dialog will save to. Typed text that names an
+   * existing project means that project; other text means a new project.
+   */
+  get factProject(): ProjectChoice | null {
+    const choice = this.factProjectChoice;
+
+    if (choice == null || typeof choice !== 'string') {
+      return choice;
+    }
+
+    const name = choice.trim();
+    const existing = this.projects.find((p) => p.id != null && p.name.toLowerCase() === name.toLowerCase());
+
+    return existing ? { id: existing.id!, name: existing.name } : name ? { id: null, name } : null;
+  }
+
+  /** True when saving the fact dialog will also create a project. */
+  get factCreatesProject(): boolean {
+    return this.fact?.id == null && this.factProject != null && this.factProject.id == null;
+  }
+
+  /**
+   * Opens the fact dialog to rename a fact or change its description. The
+   * dialog edits a copy, and hides the project; the text and statements the
+   * fact was saved from are sent back unchanged.
+   */
+  editFact(event: Event, fact: Fact): void {
+    event.stopPropagation();
+
+    this.fact = { ...fact, statements: [...(fact.statements ?? [])] };
     this.visible = true;
   }
 
   saveFact(): void {
+    if (this.fact != null && this.fact.id == null) {
+      const project = this.factProject;
+
+      if (project == null) {
+        return;
+      }
+
+      this.fact.projectId = project.id;
+      this.fact.projectName = project.id == null ? project.name : '';
+    }
+
     if (this.fact != null) {
       this.factService
         .save(this.fact)

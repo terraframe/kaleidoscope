@@ -1182,20 +1182,16 @@ button {
   font-size: 0.88rem;
 }
 
-.template-regulation {
-  /* Citations can run several lines; the full text is in the tooltip */
+.template-description {
+  /* Up to three lines; the full text is in the tooltip */
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
   color: var(--text-color-secondary);
-  font-size: 0.75rem;
-  line-height: 1.3;
-}
-
-.template-regulation a {
-  color: inherit;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .section-optional {
@@ -1629,7 +1625,7 @@ button {
  */
 
 ::ng-deep .save-fact-dialog {
-  width: min(28rem, calc(100vw - 2rem));
+  width: min(32rem, calc(100vw - 2rem));
 }
 
 .save-fact-dialog {
@@ -1667,4 +1663,83 @@ button {
 
 .save-fact-form textarea {
   resize: vertical;
+}
+
+.save-fact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.save-fact-quote {
+  max-height: 7.5rem;
+  overflow: auto;
+  margin: 0 0 0.5rem;
+  border-left: 3px solid #10b981;
+  border-radius: 0 6px 6px 0;
+  padding: 0.55rem 0.75rem;
+  color: var(--text-color);
+  background: var(--surface-ground);
+  font-size: 0.92rem;
+}
+
+.save-fact-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  border-top: 1px solid var(--surface-border);
+  padding-top: 0.85rem;
+}
+
+.save-fact-destination {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.save-fact-destination label {
+  flex: none;
+  color: var(--text-color);
+  font-weight: 650;
+}
+
+// The dialog is appended to <body>, outside :host, so these can't be scoped to it.
+::ng-deep .save-fact-project {
+  flex: 1;
+  min-width: 0;
+}
+
+::ng-deep .save-fact-project .p-autocomplete-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+}
+
+.save-fact-in-project {
+  color: var(--text-color-secondary);
+  font-size: 0.9rem;
+}
+
+.save-fact-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.new-project-badge {
+  margin-right: auto;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.14);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+::ng-deep .new-project-option {
+  color: #047857;
+  font-weight: 650;
 }

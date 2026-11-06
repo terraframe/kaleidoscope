@@ -1,13 +1,52 @@
 {
   "id": "PLAN_EVAL",
   "name": "Plan Evaluation",
-  "regulation": "Economic and Environmental Principles and Guidelines for Water and Related Land Resources Implementation Studies (1983), as implemented by USACE ER 1105-2-100 Planning Guidance Notebook",
-  "regulationUrl": "https://webarchive.library.unt.edu/web/20130218063957/http:/publications.usace.army.mil/publications/eng-regs/ER_1105-2-100/toc.pdf",
+  "description": "The 'Plan Evaluation' section of a flood mitigation feasibility study. Scoped to a single section to demonstrate a 'proof of concept' for report generation. Evaluates the final array under the 1983 P&G four accounts (NED, RED, EQ, OSE).",
+  "references": [
+    {
+      "citation": "Principles and Guidelines (1983)",
+      "title": "Economic and Environmental Principles and Guidelines for Water and Related Land Resources Implementation Studies",
+      "url": null,
+      "role": "planning-criteria",
+      "provisions": [],
+      "summary": "Evaluate each alternative in the final array against the four criteria (completeness, effectiveness, efficiency, acceptability) and display its effects in the four accounts: National Economic Development (NED), Regional Economic Development (RED), Environmental Quality (EQ) and Other Social Effects (OSE). Identify the plan that reasonably maximizes net NED benefits.",
+      "notes": [
+        "Framework the example report says it follows (Upper Guadalupe River GRR, section 3). The summary is based on the criteria and account definitions quoted in that report; the 1983 document itself was not reviewed.",
+        "No authoritative online copy was located, so url is null.",
+        "Replaced for new studies by the PR&G as implemented in 33 CFR Part 234; see the PLAN_EVAL_234 template."
+      ]
+    },
+    {
+      "citation": "ER 1105-2-100",
+      "title": "Planning Guidance Notebook",
+      "url": "https://webarchive.library.unt.edu/web/20130218063957/http:/publications.usace.army.mil/publications/eng-regs/ER_1105-2-100/toc.pdf",
+      "role": "report-format",
+      "provisions": [],
+      "summary": "USACE's implementation of the 1983 Principles and Guidelines, which the example report followed for plan formulation and evaluation and for its post-authorization change summary (Appendix G format).",
+      "notes": [
+        "The url points to an archived (UNT web archive) table of contents for ER 1105-2-100, the USACE Planning Guidance Notebook. No current official copy was found on the USACE publications site; replace the link if one is located.",
+        "Not reviewed directly. Chapter 4 and Appendix G were superseded by EP 1105-2-62 (24 December 2025), and Appendix H by EP 1105-2-61 (1 July 2023)."
+      ]
+    },
+    {
+      "citation": "33 USC 2282(a)(2)",
+      "title": "Feasibility studies: contents of feasibility reports",
+      "url": "https://www.law.cornell.edu/uscode/text/33/2282",
+      "role": "required-contents",
+      "provisions": [
+        "(a)(2)"
+      ],
+      "summary": "Describe, with reasonable certainty, the economic, environmental and social benefits and detriments of the recommended plan and each alternative considered. Include the engineering features (including hydrologic and geologic information), public acceptability, and the purposes, scope and scale of the recommended plan. Include the views of other agencies, a nonstructural alternative if the recommended plan lacks significant nonstructural features, and a preliminary analysis of the Federal interest.",
+      "notes": [
+        "Statutory minimum for a whole feasibility report; this template covers only the plan evaluation part. EP 1105-2-62 §3-2 points here for feasibility report contents, and §2-1 says feasibility studies include those that result in a general reevaluation report.",
+        "Summary paraphrases the statute text read on law.cornell.edu on 2026-11-05."
+      ]
+    }
+  ],
   "notes": [
     "Provenance: built by hand on 2026-11-04 from section 3.5 Plan Evaluation (pp. 105-115) of the Upper Guadalupe River Draft Integrated General Reevaluation Report & Supplemental Environmental Assessment. Examples are excerpts from that report with tables converted to markdown.",
     "Follows the 1983 Economic and Environmental Principles and Guidelines (P&G), as the example report does: sections are organized by the four P&G evaluation criteria (efficiency, effectiveness, acceptability, completeness) and the four accounts (NED, RED, EQ, OSE).",
     "33 CFR Part 234 (USACE Agency Specific Procedures for the PR&G) was confirmed in effect on eCFR as of 2026-11-03 and lists general re-evaluation reports among the studies it covers (234.4(d)(1)). New studies likely need the PLAN_EVAL_234 template (plan-eval-234.json) instead; confirm with USACE planning whether studies already underway may continue under the P&G.",
-    "regulationUrl points to an archived (UNT web archive) table of contents for ER 1105-2-100, the USACE Planning Guidance Notebook. No current official copy was found on the USACE publications site; replace the link if one is located.",
     "The report's single 3.5.1 'NED Analysis' subsection was split into 'National Economic Development (NED) Analysis' (net benefits and BCR; the efficiency criterion), 'Effectiveness and Residual Risk', and 'Acceptability and Completeness', because each draws on different data. The NED section name is kept exactly as the report uses it because ReportGenerationIntegrationTest refers to it by name.",
     "The four P&G criteria and four accounts are not a 4x4 matrix: both are scored per alternative. The report's combined alternatives-by-criteria/accounts table (Table 41) and the plan ranking are in its section 5.1 Plan Comparison and belong in a separate Plan Comparison template, not this one.",
     "Study-type dependence: 'Effectiveness and Residual Risk' and the OSE sections assume a flood risk management study (expected annual damages, HEC-FDA, population at risk, AEP floodplains, LifeSim). Ecosystem restoration studies are evaluated with cost-effectiveness and incremental cost analysis instead and would likely need their own template rather than more optional sections.",

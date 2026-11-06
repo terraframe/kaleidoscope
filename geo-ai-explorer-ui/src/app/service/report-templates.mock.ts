@@ -4,16 +4,53 @@ import { ReportTemplate } from '../models/report.model';
  * Mock report templates for ReportService until the back end is hooked up.
  *
  * GENERATED from geo-ai-explorer-api/src/main/resources/report-templates/*.json
- * (review notes left out, as the API does). Don't edit by hand; delete this
+ * (template and reference notes left out, as the API does). Don't edit by hand; delete this
  * file once templates come from the server.
  */
 export const MOCK_TEMPLATES: ReportTemplate[] = [
   {
     id: 'PLAN_EVAL_234',
     name: 'Plan Evaluation (33 CFR Part 234)',
-    regulation:
-      '33 CFR Part 234, Corps of Engineers Agency Specific Procedures to Implement the Principles, Requirements and Guidelines for Federal Investments in Water Resources (89 FR 104021, Dec. 19, 2024), principally §§ 234.7, 234.9 and 234.10',
-    regulationUrl: 'https://www.ecfr.gov/current/title-33/chapter-II/part-234',
+    description: 'Evaluates the final array under the current PR&G: costs, benefits, effects and Guiding Principles.',
+    references: [
+      {
+        citation: '33 USC 2282(a)(2)',
+        title: 'Feasibility studies: contents of feasibility reports',
+        url: 'https://www.law.cornell.edu/uscode/text/33/2282',
+        role: 'required-contents',
+        provisions: ['(a)(2)'],
+        summary:
+          'Describe, with reasonable certainty, the economic, environmental and social benefits and detriments of the recommended plan and each alternative considered. Include the engineering features (including hydrologic and geologic information), public acceptability, and the purposes, scope and scale of the recommended plan. Include the views of other agencies, a nonstructural alternative if the recommended plan lacks significant nonstructural features, and a preliminary analysis of the Federal interest.',
+      },
+      {
+        citation: '33 CFR Part 234',
+        title:
+          'Corps of Engineers Agency Specific Procedures to Implement the Principles, Requirements and Guidelines for Federal Investments in Water Resources',
+        url: 'https://www.ecfr.gov/current/title-33/chapter-II/part-234',
+        role: 'planning-criteria',
+        provisions: ['234.7', '234.9', '234.10'],
+        summary:
+          'Evaluate every alternative in the final array against the No Action condition, covering economic, environmental and social effects, monetized where practicable, otherwise quantified or described. Compare alternatives on benefits and costs, the study objectives, the four formulation criteria (completeness, effectiveness, efficiency, acceptability) and the Guiding Principles.',
+      },
+      {
+        citation: 'EP 1105-2-62',
+        title: 'Planning Studies, Reports and Programs',
+        url: 'https://publibrary.sec.usace.army.mil/api/download?id=24d3d0f4-9933-4b60-e35f-a122fb876dfa&filename=EP+1105-2-62_PlanningStudiesReportsAndPrograms_10DEC2025_FINAL.pdf&token=&preview=true',
+        role: 'report-format',
+        provisions: ['3-2', '4-2'],
+        summary:
+          'General reevaluation reports are prepared to feasibility-report scope and level of detail, reformulating the authorized plan using current planning criteria (the Federal Objective and Guiding Principles in ER 1105-2-103).',
+      },
+      {
+        citation: 'EP 1105-2-61, §4-10',
+        title: 'Feasibility and Post-Authorization Study Procedures and Report Processing Requirements',
+        url: 'https://www.publications.usace.army.mil/Portals/76/EP%201105-2-61_2023%2007%2001.pdf',
+        role: 'uncertainty-reporting',
+        provisions: ['4-10'],
+        summary:
+          'Report uncertain values as ranges (at least upper and lower limits), with five-number summaries and confidence intervals where data allow. State likelihoods for key decision values (for example, the probability that net benefits exceed zero). Show how plausible changes to key assumptions affect the results and the comparison of alternatives, and explain what would have to happen to reach the high and low ends of each range.',
+      },
+    ],
     sections: [
       {
         name: 'Evaluation Framework',
@@ -112,10 +149,37 @@ export const MOCK_TEMPLATES: ReportTemplate[] = [
   {
     id: 'PLAN_EVAL',
     name: 'Plan Evaluation',
-    regulation:
-      'Economic and Environmental Principles and Guidelines for Water and Related Land Resources Implementation Studies (1983), as implemented by USACE ER 1105-2-100 Planning Guidance Notebook',
-    regulationUrl:
-      'https://webarchive.library.unt.edu/web/20130218063957/http:/publications.usace.army.mil/publications/eng-regs/ER_1105-2-100/toc.pdf',
+    description: 'Evaluates the final array under the 1983 P&G four accounts (NED, RED, EQ, OSE).',
+    references: [
+      {
+        citation: 'Principles and Guidelines (1983)',
+        title:
+          'Economic and Environmental Principles and Guidelines for Water and Related Land Resources Implementation Studies',
+        url: null,
+        role: 'planning-criteria',
+        provisions: [],
+        summary:
+          'Evaluate each alternative in the final array against the four criteria (completeness, effectiveness, efficiency, acceptability) and display its effects in the four accounts: National Economic Development (NED), Regional Economic Development (RED), Environmental Quality (EQ) and Other Social Effects (OSE). Identify the plan that reasonably maximizes net NED benefits.',
+      },
+      {
+        citation: 'ER 1105-2-100',
+        title: 'Planning Guidance Notebook',
+        url: 'https://webarchive.library.unt.edu/web/20130218063957/http:/publications.usace.army.mil/publications/eng-regs/ER_1105-2-100/toc.pdf',
+        role: 'report-format',
+        provisions: [],
+        summary:
+          "USACE's implementation of the 1983 Principles and Guidelines, which the example report followed for plan formulation and evaluation and for its post-authorization change summary (Appendix G format).",
+      },
+      {
+        citation: '33 USC 2282(a)(2)',
+        title: 'Feasibility studies: contents of feasibility reports',
+        url: 'https://www.law.cornell.edu/uscode/text/33/2282',
+        role: 'required-contents',
+        provisions: ['(a)(2)'],
+        summary:
+          'Describe, with reasonable certainty, the economic, environmental and social benefits and detriments of the recommended plan and each alternative considered. Include the engineering features (including hydrologic and geologic information), public acceptability, and the purposes, scope and scale of the recommended plan. Include the views of other agencies, a nonstructural alternative if the recommended plan lacks significant nonstructural features, and a preliminary analysis of the Federal interest.',
+      },
+    ],
     sections: [
       {
         name: 'Evaluation Framework',
