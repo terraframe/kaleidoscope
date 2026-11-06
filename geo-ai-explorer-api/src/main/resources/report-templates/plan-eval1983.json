@@ -1,6 +1,6 @@
 {
   "id": "PLAN_EVAL",
-  "name": "Plan Evaluation",
+  "name": "Plan Evaluation (1983)",
   "description": "The 'Plan Evaluation' section of a flood mitigation feasibility study. Scoped to a single section to demonstrate a 'proof of concept' for report generation. Evaluates the final array under the 1983 P&G four accounts (NED, RED, EQ, OSE).",
   "references": [
     {

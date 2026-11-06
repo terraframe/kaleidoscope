@@ -23,7 +23,9 @@ public class WebConfiguration implements WebMvcConfigurer, AsyncConfigurer
   @Override
   public void addCorsMappings(CorsRegistry registry)
   {
-    registry.addMapping("/**").allowedOrigins("*");
+    // Spring allows only GET, HEAD and POST unless told otherwise; the API
+    // also uses PUT and DELETE (e.g. deleting a fact).
+    registry.addMapping("/**").allowedOrigins("*").allowedMethods("GET", "HEAD", "POST", "PUT", "DELETE");
   }
 
   @Override

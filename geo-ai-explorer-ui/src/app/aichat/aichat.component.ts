@@ -162,6 +162,16 @@ export class AichatComponent {
   public facts: Fact[] = [];
   public factGroups: FactGroup[] = [];
   public expandedFactId: number | null = null;
+
+  /** The report wizard's "+ New project…" option, and its name box. */
+  readonly NEW_PROJECT = 'new' as const;
+  creatingProject = false;
+  creatingProjectRequest = false;
+  newProjectName = '';
+  /** True once the projects have loaded, so an empty list really means none. */
+  projectsLoaded = false;
+  /** The project Save as Fact defaults to; set when exploring for a report's facts. */
+  factProjectId: number | null = null;
   /** The fact whose full query is open in the query dialog. */
   queryFact: Fact | null = null;
   queryVisible = false;
@@ -1305,7 +1315,7 @@ export class AichatComponent {
 
   /** Facts that can be picked for the active report: those in its project. */
   get availableReportFacts(): Fact[] {
-    const projectId = this.activeReport?.projectId;
+    const projectId = this.selectedProject?.id;
 
     return projectId == null ? [] : this.facts.filter((f) => f.projectId === projectId);
   }
@@ -1343,7 +1353,7 @@ export class AichatComponent {
 
     const report = conversation.report;
 
-    return !report?.templateId || report.projectId == null || conversation.messages.length === 0;
+    return !report?.templateId || this.selectedProject == null || conversation.messages.length === 0;
   }
 
   selectTemplate(templateId: string): void {
@@ -1366,6 +1376,65 @@ export class AichatComponent {
     this.expandedSections.clear();
 
     this.saveConversations();
+  }
+
+  /** The report wizard's project step shows a name box instead of the dropdown. */
+  get showNewProjectForm(): boolean {
+    return this.creatingProject || (this.projectsLoaded && this.projects.length === 0);
+  }
+
+  onReportProjectSelect(value: number | typeof this.NEW_PROJECT | null): void {
+    if (value === this.NEW_PROJECT) {
+      this.creatingProject = true;
+      this.newProjectName = '';
+    } else {
+      this.selectProject(value);
+    }
+  }
+
+  cancelNewProject(): void {
+    this.creatingProject = false;
+    this.newProjectName = '';
+  }
+
+  /**
+   * Creates a project from the report wizard and selects it. A name that
+   * matches an existing project (ignoring case) selects that one instead.
+   */
+  createReportProject(): void {
+    const name = this.newProjectName.trim();
+
+    if (!name || this.creatingProjectRequest) {
+      return;
+    }
+
+    const existing = this.projects.find((p) => p.id != null && p.name.toLowerCase() === name.toLowerCase());
+
+    if (existing) {
+      this.selectProject(existing.id!);
+      this.cancelNewProject();
+      return;
+    }
+
+    this.creatingProjectRequest = true;
+    this.projectService
+      .create(name)
+      .then((project) => {
+        this.projects = [project, ...this.projects];
+        this.selectProject(project.id!);
+        this.cancelNewProject();
+      })
+      .catch((error) => this.errorService.handleError(error))
+      .finally(() => (this.creatingProjectRequest = false));
+  }
+
+  /**
+   * Starts a data exploration chat to find facts for the report's project.
+   * Save as Fact then defaults to that project.
+   */
+  exploreForFacts(): void {
+    this.factProjectId = this.selectedProject?.id ?? null;
+    this.newConversation(true, 'exploration');
   }
 
   selectProject(projectId: number | null): void {
@@ -1484,7 +1553,7 @@ export class AichatComponent {
   get canGenerateReport(): boolean {
     const report = this.activeReport;
 
-    return !!report?.templateId && report.projectId != null && !this.loading;
+    return !!report?.templateId && this.selectedProject != null && !this.loading;
   }
 
   /** Asks the report agent to write the report from the current setup. */
@@ -1651,8 +1720,9 @@ export class AichatComponent {
       text: message.text,
     };
 
-    const first = this.projects.find((p) => p.id != null);
-    this.factProjectChoice = first ? { id: first.id!, name: first.name } : null;
+    const preferred =
+      this.projects.find((p) => p.id != null && p.id === this.factProjectId) ?? this.projects.find((p) => p.id != null);
+    this.factProjectChoice = preferred ? { id: preferred.id!, name: preferred.name } : null;
     this.visible = true;
   }
 
@@ -1744,6 +1814,7 @@ export class AichatComponent {
       .getAll()
       .then((projects) => {
         this.projects = projects;
+        this.projectsLoaded = true;
 
         return Promise.all(
           projects

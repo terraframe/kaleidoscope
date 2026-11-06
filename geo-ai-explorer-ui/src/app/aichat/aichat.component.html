@@ -408,17 +408,46 @@
 
             <div class="report-step">
               <h3 class="report-step-title"><span class="step-number">2</span> Project</h3>
-              <select
-                class="report-project-select"
-                aria-label="Project"
-                [ngModel]="report.projectId"
-                (ngModelChange)="selectProject($event)"
-              >
-                <option [ngValue]="null" disabled>Select a project…</option>
-                @for (project of projects; track project.id) {
-                  <option [ngValue]="project.id">{{ project.name }}</option>
+              @if (showNewProjectForm) {
+                @if (projects.length === 0) {
+                  <p class="report-step-hint">No projects yet. Name one to start; its facts will go in it.</p>
                 }
-              </select>
+                <div class="new-project-row">
+                  <input
+                    class="report-project-select new-project-name"
+                    type="text"
+                    aria-label="New project name"
+                    placeholder="New project name"
+                    maxlength="255"
+                    autocomplete="off"
+                    [(ngModel)]="newProjectName"
+                    (keydown.enter)="createReportProject()"
+                    (keydown.escape)="cancelNewProject()"
+                  />
+                  <p-button
+                    label="Create project"
+                    [disabled]="!newProjectName.trim() || creatingProjectRequest"
+                    (onClick)="createReportProject()"
+                  >
+                  </p-button>
+                  @if (projects.length > 0) {
+                    <p-button severity="secondary" label="Cancel" (onClick)="cancelNewProject()"> </p-button>
+                  }
+                </div>
+              } @else {
+                <select
+                  class="report-project-select"
+                  aria-label="Project"
+                  [ngModel]="selectedProject?.id ?? null"
+                  (ngModelChange)="onReportProjectSelect($event)"
+                >
+                  <option [ngValue]="null" disabled>Select a project…</option>
+                  @for (project of projects; track project.id) {
+                    <option [ngValue]="project.id">{{ project.name }}</option>
+                  }
+                  <option [ngValue]="NEW_PROJECT">+ New project…</option>
+                </select>
+              }
             </div>
 
             <div class="report-step">
@@ -434,10 +463,18 @@
                   </span>
                 }
               </h3>
-              @if (report.projectId == null) {
+              @if (selectedProject == null) {
                 <p class="report-step-hint">Pick a project to see its facts.</p>
               } @else if (availableReportFacts.length === 0) {
-                <p class="report-step-hint">This project has no facts yet. Save some from a data exploration chat.</p>
+                <div class="no-facts">
+                  <p class="report-step-hint">
+                    {{ selectedProject.name }} has no facts yet. Facts are answers saved from data exploration chats.
+                  </p>
+                  <p-button severity="secondary" (onClick)="exploreForFacts()">
+                    <fa-icon [icon]="explorationChatIcon"></fa-icon>
+                    <span>Explore data for this project</span>
+                  </p-button>
+                </div>
               } @else if (!selectedTemplate) {
                 <p class="report-step-hint">Pick a template to assign facts to its sections.</p>
               } @else {

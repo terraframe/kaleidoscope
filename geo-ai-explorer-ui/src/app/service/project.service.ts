@@ -14,4 +14,8 @@ export class ProjectService {
   getAll(): Promise<Project[]> {
     return firstValueFrom(this.http.get<Project[]>(apiBase() + 'api/projects'));
   }
+
+  create(name: string): Promise<Project> {
+    return firstValueFrom(this.http.post<Project>(apiBase() + 'api/projects', { name }));
+  }
 }

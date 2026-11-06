@@ -1218,6 +1218,28 @@ button {
   outline: none;
 }
 
+.new-project-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.new-project-row .new-project-name {
+  flex: 1 1 14rem;
+}
+
+.no-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.no-facts .report-step-hint {
+  margin: 0;
+}
+
 .report-generate {
   display: flex;
   align-items: center;

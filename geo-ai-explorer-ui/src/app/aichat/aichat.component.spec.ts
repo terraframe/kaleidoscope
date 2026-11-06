@@ -382,6 +382,61 @@ describe('AichatComponent', () => {
     expect(component.expandedFactId).toBe(fact.id!);
   });
 
+  describe('report project step', () => {
+    beforeEach(() => {
+      component.newConversation(true, 'report');
+      component.selectTemplate('PLAN_EVAL_234');
+    });
+
+    it('treats a project that no longer exists as none', () => {
+      component.activeReport!.projectId = 999;
+
+      expect(component.selectedProject).toBeUndefined();
+      expect(component.availableReportFacts).toEqual([]);
+      expect(component.canGenerateReport).toBeFalse();
+    });
+
+    it('shows the name box when there are no projects', () => {
+      expect(component.showNewProjectForm).toBeFalse();
+      component.projects = [];
+      expect(component.showNewProjectForm).toBeTrue();
+    });
+
+    it('creates a project from "+ New project…" and selects it', async () => {
+      component.onReportProjectSelect(component.NEW_PROJECT);
+      expect(component.showNewProjectForm).toBeTrue();
+
+      component.newProjectName = ' Kerr Dam ';
+      component.createReportProject();
+      const req = http.expectOne(apiBase() + 'api/projects');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ name: 'Kerr Dam' });
+      req.flush({ id: 3, name: 'Kerr Dam' });
+      await settle();
+
+      expect(component.selectedProject).toEqual({ id: 3, name: 'Kerr Dam' });
+      expect(component.showNewProjectForm).toBeFalse();
+    });
+
+    it('selects an existing project instead of creating one with the same name', () => {
+      component.onReportProjectSelect(component.NEW_PROJECT);
+      component.newProjectName = 'upper guadalupe river grr';
+      component.createReportProject();
+
+      http.expectNone(apiBase() + 'api/projects');
+      expect(component.selectedProject?.id).toBe(1);
+    });
+
+    it('explores for facts in a new chat that saves to the report project', () => {
+      component.selectProject(2);
+      component.exploreForFacts();
+
+      expect(component.isReportChat).toBeFalse();
+      component.createFact(new Event('click'), { text: 'x', statements: [] } as any);
+      expect(component.factProject).toEqual({ id: 2, name: 'Lower Mississippi Levee Assessment' });
+    });
+  });
+
   it('has no add-to-report controls on Facts tab cards', () => {
     component.newConversation(true, 'report');
     component.setActiveSidebarTab('facts');
