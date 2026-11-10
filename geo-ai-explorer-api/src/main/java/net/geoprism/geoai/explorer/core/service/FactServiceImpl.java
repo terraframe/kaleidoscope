@@ -69,6 +69,7 @@ public class FactServiceImpl extends CrudServiceImpl<Fact, Long> implements Fact
     entity.setName(dto.getName());
     entity.setStatements(JsonMapper.shared().writeValueAsString(dto.getStatements()));
     entity.setText(dto.getText());
+    entity.setMapStatement(dto.getMapStatement());
 
     return toDTO(repository.save(entity), project);
   }
@@ -87,6 +88,7 @@ public class FactServiceImpl extends CrudServiceImpl<Fact, Long> implements Fact
         .description(entity.getDescription()) //
         .statements(JsonMapper.shared().readerForListOf(String.class).readValue(entity.getStatements())) //
         .text(entity.getText()) //
+        .mapStatement(entity.getMapStatement()) //
         .projectId(project.getId()) //
         .projectName(project.getName()) //
         .build();

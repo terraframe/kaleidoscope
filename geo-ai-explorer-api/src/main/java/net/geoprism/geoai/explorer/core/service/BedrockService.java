@@ -132,7 +132,11 @@ public class BedrockService
                     .build()) //
                 .putDocument("mapIt", Document.mapBuilder() //
                     .putString("type", "boolean") //
-                    .putString("description", "true only when the text describes the result set returned by a single invocation of the SPARQL query tool and that result set contains locations that can be drawn on a map (for example, \"200 land parcels are at risk under the No Mitigation scenario\"). Set it to false when the text is about a single object, even if you found that object with a SPARQL query. Also set it to false when the text combines the results of several SPARQL queries, or when no SPARQL query was run.") //
+                    .putString("description", "true only when the text describes the result set returned by a single invocation of the SPARQL query tool and that result set contains locations that can be drawn on a map (for example, \"200 land parcels are at risk under the No Mitigation scenario\"). Set it to false when the text is about a single object, even if you found that object with a SPARQL query.") //
+                    .build()) //
+                .putDocument("mapStatement", Document.mapBuilder() //
+                    .putString("type", "string") //
+                    .putString("description", "Required whenever mapIt is true, and omitted otherwise: a SPARQL SELECT statement, which you do not execute, that allows the end user to audit the results visually on a map by querying the lowest-level objects the answer is based on. It must select ?uri ?type ?code ?label ?wkt, retrieving ?wkt in an OPTIONAL block.") //
                     .build()) //
                 .putDocument("reasoning", Document.mapBuilder() //
                     .putString("type", "string") //
@@ -212,6 +216,19 @@ public class BedrockService
         .map(t -> t.getStatement())
         .filter(s -> StringUtils.isNotBlank(s))
         .toList());
+
+    /*
+     * The map statement is only requested when mapIt is true. Drop a stray one
+     * so that the UI only offers "View on Map" for mappable answers.
+     */
+    if (Boolean.TRUE.equals(response.getMapIt()))
+    {
+      message.setMapStatement(MapStatementValidator.validate(response.getMapStatement()));
+    }
+    else if (StringUtils.isNotBlank(response.getMapStatement()))
+    {
+      log.warn("Ignoring map statement returned with mapIt=false: {}", response.getMapStatement());
+    }
 
     return message;
   }

@@ -236,6 +236,20 @@ public class KaleidoscopeChatPromptService extends ChatPromptService
   }
 
   @Override
+  protected String mapStatement()
+  {
+    return super.mapStatement() + """
+        
+        Additional mapStatement rules for this database:
+        - Never place lpgv/lpgvs triples and cwbi/REMIS triples in the same GRAPH block.
+        - Budget and costing questions: the rule to query only the REMIS_PROJECTS graph applies to the queries you execute. The mapStatement for a budget or costing question SHOULD join to the lpg graph by code: return the lpgvs:Project objects associated with the program, their geometries, their project-level costs when available, and any program-level aggregate values used in your answer.
+        - Inundation questions: return the objects reached through InundationArea -> InundatedObject for the specified InundationArea.
+        - Type-specific attributes to select: CensusTract and School: ?population. RealProperty: ?realPropertyType and ?realPropertyUse. Projects with financial data: ?cost.
+        - Only use context from earlier in the conversation when it is relevant to the current answer. For example, do not reuse an earlier channel reach discussion in a mapStatement about a program.
+            """;
+  }
+
+  @Override
   protected List<String> buildExamples()
   {
     List<String> examples = new ArrayList<String>();
@@ -244,8 +258,52 @@ public class KaleidoscopeChatPromptService extends ChatPromptService
     examples.add(budgetLineItemExample());
     examples.add(budgetAggregateExample());
     examples.add(crossGraphJoinExample());
+    examples.add(budgetMapStatementExample());
     
     return examples;
+  }
+
+  protected String budgetMapStatementExample()
+  {
+    return """
+    =
+    Map statement for a budget question
+    
+    Q: "How much was spent on a program with code '000510'?"
+    After executing the 'budget aggregate query' against the REMIS_PROJECTS graph only, the mapStatement returns the projects whose costs were aggregated, joined by code to lpgvs:Project for their geometries:
+    =
+    
+    PREFIX cwbi: <http://dime.usace.mil/ontologies/cwbi-concept#>
+    PREFIX lpgs: <https://localhost:4200/lpg/rdfs#>
+    PREFIX lpgvs: <%1$s/rdfs#>
+    PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+    
+    SELECT DISTINCT ?uri ?type ?code ?label ?wkt ?cost
+    WHERE {
+      GRAPH <http://dime.usace.mil/data/dataset#REMIS_PROJECTS> {
+        ?program a cwbi:Program ;
+                 skos:altLabel "000510" .
+        ?rem_proj a cwbi:Remis_Project ;
+                  cwbi:Program ?program ;
+                  skos:altLabel ?code .
+        OPTIONAL { ?rem_proj cwbi:ProjectCost ?cost . }
+      }
+    
+      GRAPH <%2$s> {
+        ?uri a lpgvs:Project ;
+             lpgs:GeoObject-code ?code ;
+             rdfs:label ?label .
+        OPTIONAL {
+          ?uri geo:hasGeometry ?geometry .
+          ?geometry geo:asWKT ?wkt .
+        }
+      }
+    
+      BIND("Project" AS ?type)
+    }
+        """;
   }
   
   protected String aggregateFunctions()
@@ -287,7 +345,6 @@ public class KaleidoscopeChatPromptService extends ChatPromptService
         ?type
         ?code
         ?label
-        ?wkt
         ?population
         ?totalPopulation
         WHERE {
@@ -307,11 +364,6 @@ public class KaleidoscopeChatPromptService extends ChatPromptService
              lpgvs:CensusTract-population ?population .
         
         BIND("CensusTract" AS ?type)
-        
-        OPTIONAL {
-          ?uri geo:hasGeometry ?geometry .
-          ?geometry geo:asWKT ?wkt .
-        }
         
         
         }
@@ -339,6 +391,8 @@ public class KaleidoscopeChatPromptService extends ChatPromptService
         }
         ORDER BY ASC(?label)
         LIMIT 100
+        
+        Notice that this executed query does not fetch geometries. The mapStatement for this question returns the same census tracts with ?wkt added to the SELECT and the OPTIONAL geometry block added, and without the ORDER BY and LIMIT.
             """;
   }
 

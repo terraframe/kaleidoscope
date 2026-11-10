@@ -29,7 +29,7 @@ import {
 
 import { ChatService } from '../service/chat-service.service';
 import { initialState, parseText } from '../state/chat.state';
-import { ChatMessage, Fact, Project } from '../models/chat.model';
+import { ChatMessage, Fact, LocationPage, Project } from '../models/chat.model';
 import { ErrorService } from '../service/error-service.service';
 import {
   ExplorerActions,
@@ -462,7 +462,7 @@ export class AichatComponent {
     return {
       ...message,
       renderedHtml: message.sender === 'system' ? this.renderMarkdown(parsedText) : parsedText,
-      savedQueryIndex: message.mappable ? this.getSavedQueryIndexForConversation(conversation, message) : null,
+      savedQueryIndex: this.isMappable(message) ? this.getSavedQueryIndexForConversation(conversation, message) : null,
     };
   }
 
@@ -737,6 +737,7 @@ export class AichatComponent {
             location: response.location,
             reasoning: response.reasoning,
             statements: response.statements ?? [],
+            mapStatement: response.mapStatement ?? null,
             pendingStatusUrl: undefined,
           });
 
@@ -974,21 +975,63 @@ export class AichatComponent {
   }
 
   getMessageQueryId(message: ChatMessage): string | null {
-    const history = this.getMappableHistory(message);
+    const conversation = this.activeConversation;
+
+    return conversation ? this.getQueryIdForConversation(conversation, message) : null;
+  }
+
+  /**
+   * True when the agent flagged the message as mappable. Mappable messages
+   * carry a map statement, which mapIt runs directly; older messages without
+   * one fall back to the map-it agent.
+   */
+  isMappable(message: ChatMessage): boolean {
+    return message.mappable;
+  }
+
+  /** Cache id of the pages a message maps to. */
+  private getQueryIdForConversation(conversation: ChatConversation, message: ChatMessage): string | null {
+    if (message.mapStatement) {
+      return this.explorerSessionState.getOrCreatePageRequestId(message.mapStatement, null, 0, 100);
+    }
+
+    const history = this.getMappableHistoryForConversation(conversation, message);
 
     return history ? this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100) : null;
   }
 
-  private getSavedQueryIndexForConversation(conversation: ChatConversation, message: ChatMessage): number | null {
-    const history = this.getMappableHistoryForConversation(conversation, message);
+  /**
+   * Fetches the pages to draw on the map for a message. Messages with a map
+   * statement run it directly. Older messages without one fall back to having
+   * the map-it agent generate SPARQL from the conversation history.
+   */
+  private fetchMapPages(conversation: ChatConversation, message: ChatMessage): Promise<LocationPage[]> | null {
+    const statement = message.mapStatement;
 
-    if (!history) {
-      return null;
+    if (statement) {
+      return this.chatService.getPage(statement, null, 0, 100).then((page) => {
+        const pages = [page];
+
+        // Re-cache as a mapped chat query so it is labelled as one if saved
+        this.explorerSessionState.cachePages(
+          pages,
+          'chat-mapit',
+          this.explorerSessionState.getOrCreatePageRequestId(statement, null, 0, 100)
+        );
+
+        return pages;
+      });
     }
 
-    const queryId = this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100);
+    const history = this.getMappableHistoryForConversation(conversation, message);
 
-    return this.savedQueryIndexById.get(queryId) ?? null;
+    return history ? this.chatService.getLocations(history, 0, 100) : null;
+  }
+
+  private getSavedQueryIndexForConversation(conversation: ChatConversation, message: ChatMessage): number | null {
+    const queryId = this.getQueryIdForConversation(conversation, message);
+
+    return queryId ? this.savedQueryIndexById.get(queryId) ?? null : null;
   }
 
   saveOrScrollQuery(event: Event, message: ChatMessage): void {
@@ -1015,16 +1058,16 @@ export class AichatComponent {
       return;
     }
 
-    const history = this.getMappableHistory(message);
+    const conversation = this.activeConversation;
+    const request = conversation ? this.fetchMapPages(conversation, message) : null;
 
-    if (!history) {
+    if (!request) {
       return;
     }
 
     this.mapLoading = true;
 
-    this.chatService
-      .getLocations(history, 0, 100)
+    request
       .then((pages) => {
         if (!this.explorerSessionState.hasResults(pages)) {
           this.messageService.add({
@@ -1093,16 +1136,10 @@ export class AichatComponent {
     queryId: string
   ): { conversation: ChatConversation; message: ChatMessage } | null {
     for (const conversation of this.conversations) {
-      const mappableMessages = conversation.messages.filter((message) => message.mappable);
+      const mappableMessages = conversation.messages.filter((message) => this.isMappable(message));
 
       for (const message of mappableMessages) {
-        const history = this.getMappableHistoryForConversation(conversation, message);
-
-        if (!history) {
-          continue;
-        }
-
-        const messageQueryId = this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100);
+        const messageQueryId = this.getQueryIdForConversation(conversation, message);
 
         if (messageQueryId === queryId) {
           return { conversation, message };
@@ -1111,16 +1148,6 @@ export class AichatComponent {
     }
 
     return null;
-  }
-
-  private getMappableHistory(message: ChatMessage): ChatMessage[] | null {
-    const conversation = this.activeConversation;
-
-    if (!conversation) {
-      return null;
-    }
-
-    return this.getMappableHistoryForConversation(conversation, message);
   }
 
   private getMappableHistoryForConversation(
@@ -1143,16 +1170,16 @@ export class AichatComponent {
       return;
     }
 
-    const history = this.getMappableHistory(message);
+    const request = this.fetchMapPages(conversation, message);
+    const pageCacheId = this.getQueryIdForConversation(conversation, message);
 
-    if (!history) {
+    if (!request || !pageCacheId) {
       return;
     }
 
     this.mapLoading = true;
 
-    this.chatService
-      .getLocations(history, 0, 100)
+    request
       .then((pages) => {
         let total = pages.map((p) => p.count).reduce((a, b) => a + b, 0);
 
@@ -1168,8 +1195,6 @@ export class AichatComponent {
         }
 
         const step = message.ambiguous ? WorkflowStep.DisambiguateObject : WorkflowStep.MapAndResults;
-
-        const pageCacheId = this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100);
 
         this.store.dispatch(
           ExplorerActions.showPagesOnMap({
@@ -1717,6 +1742,7 @@ export class AichatComponent {
       projectId: null,
       projectName: '',
       statements: message.statements,
+      mapStatement: message.mapStatement ?? null,
       text: message.text,
     };
 

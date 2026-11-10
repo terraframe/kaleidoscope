@@ -48,6 +48,10 @@ public class Fact
   @Lob
   private String  statements;
 
+  @Lob
+  @Column(name = "map_statement")
+  private String  mapStatement;
+
   @CreationTimestamp
   @Column(name = "created_date", nullable = false, updatable = false)
   private Instant createdDate;

@@ -473,6 +473,95 @@ describe('AichatComponent', () => {
     expect(buttons[0].closest('.message')!.id).toBe(component.chatMessageElementId('b'));
   });
 
+  describe('View on Map', () => {
+    const MAP_STATEMENT = 'SELECT DISTINCT ?uri ?type ?code ?label ?wkt WHERE { }';
+
+    const PAGE = {
+      statement: MAP_STATEMENT,
+      type: null,
+      locations: [{ type: 'Feature', properties: { uri: 'u1' } }],
+      limit: 100,
+      offset: 0,
+      count: 1,
+    };
+
+    function setMessages(messages: any[]): void {
+      component.activeConversation!.messages = messages;
+      (component as any).refreshRenderedMessages();
+      fixture.detectChanges();
+    }
+
+    function mapButtons(): HTMLElement[] {
+      return Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.mappable-actions p-button')).filter((b) =>
+        b.textContent?.includes('View on Map')
+      );
+    }
+
+    it('is offered only for answers flagged mappable', () => {
+      setMessages([
+        { id: 'a', sender: 'system', text: 'plain', mappable: false, purpose: 'standard', statements: ['SELECT 1'] },
+        {
+          id: 'b',
+          sender: 'system',
+          text: 'auditable',
+          mappable: true,
+          purpose: 'standard',
+          statements: ['SELECT 1'],
+          mapStatement: MAP_STATEMENT,
+        },
+      ]);
+
+      expect(mapButtons().length).toBe(1);
+      expect(mapButtons()[0].closest('.message')!.id).toBe(component.chatMessageElementId('b'));
+    });
+
+    it('runs the map statement directly instead of asking the map-it agent', async () => {
+      const message: any = {
+        id: 'b',
+        sender: 'system',
+        text: 'auditable',
+        mappable: true,
+        purpose: 'standard',
+        statements: ['SELECT 1'],
+        mapStatement: MAP_STATEMENT,
+      };
+      setMessages([{ id: 'u', sender: 'user', text: 'q', mappable: false, purpose: 'standard', statements: [] }, message]);
+
+      const dispatch = spyOn(TestBed.inject(Store), 'dispatch');
+      component.mapIt(message);
+
+      http.expectNone(apiBase() + 'api/chat/get-locations/start');
+      const req = http.expectOne(apiBase() + 'api/chat/get-page');
+      expect(req.request.body.statement).toBe(MAP_STATEMENT);
+      req.flush(PAGE);
+      await settle();
+
+      expect(dispatch).toHaveBeenCalledWith(jasmine.objectContaining({ type: ExplorerActions.showPagesOnMap.type }));
+      expect(component.mapLoading).toBeFalse();
+    });
+
+    it('falls back to the map-it agent for older messages without a map statement', async () => {
+      const message: any = { id: 'b', sender: 'system', text: 'old', mappable: true, purpose: 'standard', statements: [] };
+      setMessages([{ id: 'u', sender: 'user', text: 'q', mappable: false, purpose: 'standard', statements: [] }, message]);
+
+      component.mapIt(message);
+
+      http.expectNone(apiBase() + 'api/chat/get-page');
+      const req = http.expectOne(apiBase() + 'api/chat/get-locations/start');
+      expect(req.request.body.messages.length).toBe(2);
+    });
+
+    it('saves the map statement with a fact', () => {
+      component.createFact(new Event('click'), {
+        text: 'x',
+        statements: ['SELECT 1'],
+        mapStatement: MAP_STATEMENT,
+      } as any);
+
+      expect(component.fact!.mapStatement).toBe(MAP_STATEMENT);
+    });
+  });
+
   it('shows each template description on its card, with no links to click by mistake', () => {
     component.newConversation(true, 'report');
     fixture.detectChanges();

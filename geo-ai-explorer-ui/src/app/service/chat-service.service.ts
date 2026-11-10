@@ -89,6 +89,7 @@ export class ChatService {
       location: response.location,
       reasoning: response.reasoning,
       statements: response.statements,
+      mapStatement: response.mapStatement ?? null,
     };
   }
 

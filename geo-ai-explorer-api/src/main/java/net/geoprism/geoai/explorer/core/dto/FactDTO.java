@@ -30,6 +30,8 @@ public class FactDTO
 
   private List<String> statements;
 
+  private String       mapStatement;
+
   private Long         projectId;
 
   @Size(max = 255, message = "projectName must be at most 255 characters")

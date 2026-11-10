@@ -49,7 +49,7 @@ public class ChatPromptService
    */
   protected String build()
   {
-    return joinComponents(instructions(), schema(), prefixes(), graphs(), types(), edges(), attributes(), schemaAddendum(), sparqlExamples());
+    return joinComponents(instructions(), schema(), prefixes(), graphs(), types(), edges(), attributes(), schemaAddendum(), geometries(), mapStatement(), sparqlExamples());
   }
 
   protected String joinComponents(String... components)
@@ -87,16 +87,18 @@ public class ChatPromptService
         Your high-level generation script is as follows:
         1. Determine whether the question can be answered from the supplied schema.
         2. If the user identifies an object by name, use the SPARQL name resolution tool to resolve or disambiguate it.
-        3. Query the configured graph to service the request.
-        4. Write the response as the JSON object described below.
+        3. Query the configured graph to service the request. Do not fetch geometries (see the 'Geometries' section).
+        4. If you are setting mapIt to true, write the mapStatement (see the 'Map Statement' section).
+        5. Write the response as the JSON object described below.
 
         ALWAYS link your location references:
         You will be given a concrete list of types. The instance data for these types are called Geo-Objects or locations. If your response mentions or otherwise references a specific location (this includes listing the object's code or label, even in a table), you must always wrap that mention in a markdown-formatted link where the link target is the full URI of the location (no prefixes). Do not link to objects which are not locations.
 
         Your final response is a JSON object with these fields:
         - text: The answer shown to the user, formatted as markdown. All of the rules for your final response below apply to this field.
-        - mapIt: true only when the text describes the result set returned by a single invocation of the query tool and that result set contains locations that can be drawn on a map (for example, "200 land parcels are at risk under the No Mitigation scenario"). Set it to false when the text is about a single object, even if you found that object with a SPARQL query. Also set it to false when the text combines the results of several SPARQL queries, or when no SPARQL query was run.
+        - mapIt: true only when the text describes the result set returned by a single invocation of the query tool and that result set contains locations that can be drawn on a map (for example, "200 land parcels are at risk under the No Mitigation scenario"). Set it to false when the text is about a single object, even if you found that object with a SPARQL query.
         - ambiguous: true only when the name resolution tool returned more than one possible match and you are asking the user to choose between them. Otherwise false.
+        - mapStatement: The SPARQL statement that lets the user visually audit your answer on a map, as described in the 'Map Statement' section. Required whenever 'mapIt' is true. Omit it otherwise.
         - reasoning: Optional. Brief notes on how you produced the answer, such as the calculations you performed. Never put any part of the answer itself here.
 
         Rules for your final response:
@@ -106,7 +108,73 @@ public class ChatPromptService
         - Do not answer questions which extend beyond assisting a decision maker to better understand, explore, visualize, communicate, or report on their data.
         - Your final response shall always begin with at least a minimal explanation. Never respond with only a list of locations.
         - ALWAYS double check your final response to make sure that all locations mentioned have proper markdown links. Remember this includes a label, code, or any other reference.
-        - Never respond with a SPARQL query.
+        - Never put a SPARQL query in the text field.
+            """;
+  }
+
+  /**
+   * Tells the chat agent that geometries exist, that they are potentially
+   * enormous, and that they belong in the map statement rather than in the
+   * queries it executes. Fetching geometries in executed queries makes them
+   * dramatically slower.
+   */
+  protected String geometries()
+  {
+    return """
+        =
+        Geometries
+        =
+
+        Many locations in the graph have a geometry, stored with GeoSPARQL:
+
+          ?object geo:hasGeometry ?geometry .
+          ?geometry geo:asWKT ?wkt .
+
+        Geometries are WKT literals and are potentially gigantic: a single polygon can contain tens of thousands of coordinates. Fetching them makes queries dramatically slower, and their results can overwhelm you. Be very careful with them. In the queries you EXECUTE with the query tool:
+        - Do NOT select ?wkt or use geo:hasGeometry or geo:asWKT. Questions about counts, totals, populations, values, costs, names, codes, attributes, relationships, or which objects are affected NEVER require geometry. Answer them from attributes and edges.
+        - Only fetch a geometry when the user explicitly asks for the geometry itself (for example its coordinates, shape, or WKT) of a specific object. Then fetch it for that single object, or at most a handful of objects, and never inside an aggregate or a query that returns many objects.
+        - Never use geometries to work out how objects relate to each other. Use the edges listed in the schema.
+
+        Geometries almost always belong in the mapStatement instead, where you will nearly always need them. The mapStatement is run by a separate system and its results are never returned to you, so including geometries there is safe and expected.
+            """;
+  }
+
+  /**
+   * Instructs the chat agent to produce, alongside its answer, a SPARQL
+   * statement returning the lowest-level objects behind the answer so the end
+   * user can audit it on a map (and so saved facts remain mappable).
+   */
+  protected String mapStatement()
+  {
+    return """
+        =
+        Map Statement (visual audit)
+        =
+
+        If you are setting 'mapIt' to true, you MUST also provide a mapStatement: a SPARQL SELECT statement which will allow the end user to audit your results visually on a map, by querying the lowest-level objects your answer is based on. The user may save your answer as a fact, and the mapStatement is how they verify where that fact came from.
+
+        You do NOT execute the mapStatement with the query tool. A separate system runs it and draws the results on a map.
+
+        Rules for the mapStatement:
+        - Return the lowest-level objects your answer is based on. If you summed the population of census tracts or structures, return those census tracts or structures. If you counted objects, return the objects you counted. If you aggregated costs up to a program, return the projects whose costs you aggregated. Do not return only the parent object (for example a scenario, program, area, or reach) when your answer was computed from its children.
+        - Use exactly the same codes, URIs, filters, scenarios, and relationship paths as the queries you executed, so the map shows exactly the objects your answer describes.
+        - The top-level SELECT MUST return these variables with these exact names:
+          ?uri - the URI of the returned object
+          ?type - the local type name, for example "Structure", produced with BIND. If the objects can be of several types, derive it from the local name of their rdf:type IRI.
+          ?code - the code of the returned object
+          ?label - the display label of the returned object
+          ?wkt - the WKT geometry of the returned object
+        - Retrieve the geometry in an OPTIONAL block so that objects without a geometry are still returned:
+          OPTIONAL {
+            ?uri geo:hasGeometry ?geometry .
+            ?geometry geo:asWKT ?wkt .
+          }
+        - After the five required variables, also select the type-specific attributes of the returned type and every attribute your answer used (for example a population, value, or cost). If your answer is an aggregate, you may also return it as an additional variable, calculated in a subquery so that it does not cross product the object rows.
+        - Use SELECT DISTINCT.
+        - Follow all of the SPARQL rules in this prompt: include all prefixes, always name the graph, respect edge directions, and wrap aggregates in parentheses.
+        - Do not add ORDER BY, LIMIT, or OFFSET. The downstream system pages through the results itself.
+        - Provide only the SPARQL text, without markdown fences or explanation.
+        - If a query you executed already returns the lowest-level objects, reuse it and add the required variables and the OPTIONAL geometry block.
             """;
   }
 

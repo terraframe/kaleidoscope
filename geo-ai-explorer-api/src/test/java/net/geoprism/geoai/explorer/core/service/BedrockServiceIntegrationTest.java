@@ -1,5 +1,8 @@
 package net.geoprism.geoai.explorer.core.service;
 
+import static net.geoprism.geoai.explorer.core.service.ChatAgentAssertions.assertNoProblems;
+import static net.geoprism.geoai.explorer.core.service.ChatAgentAssertions.checkMapStatementMatchesMapIt;
+import static net.geoprism.geoai.explorer.core.service.ChatAgentAssertions.checkNoGeometryInExecutedQueries;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -80,6 +83,11 @@ public class BedrockServiceIntegrationTest extends MockDataTest
     Assert.assertEquals(1, statements.size());
 
     System.out.println(statements.get(0));
+
+    // A single-object answer is not mapIt, so no map statement is expected
+    assertNoProblems(checkNoGeometryInExecutedQueries(statements));
+    Assert.assertFalse("Failed with message: " + message.getContent(), message.getMappable());
+    assertNoProblems(checkMapStatementMatchesMapIt(message));
   }
 
   @Test
@@ -104,6 +112,9 @@ public class BedrockServiceIntegrationTest extends MockDataTest
     Assert.assertTrue(message.getContent().contains("200"));
     Assert.assertFalse(message.getAmbiguous());
     Assert.assertTrue("Failed with message: " + message.getContent(), message.getMappable());
+
+    assertNoProblems(checkNoGeometryInExecutedQueries(message.getStatements()));
+    assertNoProblems(checkMapStatementMatchesMapIt(message, "LandParcel", "HasFloodRisk"));
   }
 
   @Test
@@ -134,6 +145,88 @@ public class BedrockServiceIntegrationTest extends MockDataTest
     Message message = service.prompt(UUID.randomUUID().toString(), "what is the total population of a structure with the name structure_25?");
 
     Assert.assertTrue("Failed with message: " + message.getContent(), message.getAmbiguous());
+
+    // Nothing to audit while the user is still choosing between matches
+    Assert.assertNull(message.getMapStatement());
+    assertNoProblems(checkNoGeometryInExecutedQueries(message.getStatements()));
+  }
+
+  @Test
+  public void testPrompt_PopulationAggregate() throws InterruptedException, ExecutionException, TimeoutException
+  {
+    when(queryService.select(anyString())).thenReturn(List.of(Map.of("totalPopulation", 5432)));
+
+    Message message = service.prompt(UUID.randomUUID().toString(), "How many people are in the project area with a code of '1'?");
+
+    System.out.println(message.getContent());
+    System.out.println(message.getMapStatement());
+
+    Assert.assertTrue("Failed with message: " + message.getContent(), message.getContent().contains("5,432") || message.getContent().contains("5432"));
+    Assert.assertFalse(message.getAmbiguous());
+    Assert.assertFalse(message.getStatements().isEmpty());
+    Assert.assertTrue("Failed with message: " + message.getContent(), message.getMappable());
+
+    // The executed aggregate must not touch geometry; the audit statement returns the summed structures
+    assertNoProblems(checkNoGeometryInExecutedQueries(message.getStatements()));
+    assertNoProblems(checkMapStatementMatchesMapIt(message, "Structure", "pop2pmu65"));
+  }
+
+  @Test
+  public void testPrompt_ScenarioComparison() throws InterruptedException, ExecutionException, TimeoutException
+  {
+    when(queryService.select(anyString())).thenReturn(List.of(Map.of("totalValue", 1000)));
+
+    Message message = service.prompt(UUID.randomUUID().toString(), "What is the total value of structures at risk with the no mitigation scenario versus the combo plan scenario?");
+
+    System.out.println(message.getContent());
+    System.out.println(message.getMapStatement());
+
+    Assert.assertTrue(message.getContent().trim().length() > 0);
+    Assert.assertFalse(message.getAmbiguous());
+
+    // Unchanged behavior: comparisons across several queries are not flagged mapIt
+    Assert.assertFalse("Failed with message: " + message.getContent(), message.getMappable());
+
+    // ...so no map statement is expected either
+    assertNoProblems(checkNoGeometryInExecutedQueries(message.getStatements()));
+    assertNoProblems(checkMapStatementMatchesMapIt(message));
+  }
+
+  @Test
+  public void testPrompt_NoQueryNeeded() throws InterruptedException, ExecutionException, TimeoutException
+  {
+    Message message = service.prompt(UUID.randomUUID().toString(), "Hello! What kinds of questions can you help me with?");
+
+    System.out.println(message.getContent());
+
+    Assert.assertTrue(message.getContent().trim().length() > 0);
+    Assert.assertTrue("Unexpected queries: " + message.getStatements(), message.getStatements().isEmpty());
+    Assert.assertNull(message.getMapStatement());
+    Assert.assertFalse(message.getMappable());
+  }
+
+  @Test
+  public void testPrompt_ExplicitGeometryRequest() throws InterruptedException, ExecutionException, TimeoutException
+  {
+    when(queryService.select(anyString())).thenReturn(List.of(Map.of("wkt", "POINT (-122.03 37.22)")));
+
+    Message message = service.prompt(UUID.randomUUID().toString(), "What is the WKT geometry of the structure with the code 2012X?");
+
+    System.out.println(message.getContent());
+    message.getStatements().forEach(System.out::println);
+
+    Assert.assertTrue(message.getContent().trim().length() > 0);
+    Assert.assertFalse(message.getStatements().isEmpty());
+
+    // Geometry is allowed here, but only for the specific object the user asked about
+    for (String statement : message.getStatements())
+    {
+      Assert.assertTrue("Geometry query was not restricted to the requested object:\n" + statement, statement.contains("2012X"));
+      Assert.assertFalse("Geometry query used an aggregate:\n" + statement, statement.toUpperCase().matches("(?s).*\\b(SUM|COUNT|AVG)\\s*\\(.*"));
+    }
+
+    // A single-object answer is not mapIt, so no map statement is expected
+    assertNoProblems(checkMapStatementMatchesMapIt(message));
   }
 
   @Test

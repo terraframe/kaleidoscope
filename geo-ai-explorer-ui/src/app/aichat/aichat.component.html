@@ -680,7 +680,7 @@
                           </p-button>
                         }
 
-                        @if (msg.mappable) {
+                        @if (isMappable(msg)) {
                           <p-button (onClick)="mapIt(msg)">
                             <fa-icon [icon]="mapIcon"></fa-icon>
                             View on Map

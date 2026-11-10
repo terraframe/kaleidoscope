@@ -13,6 +13,14 @@ export interface ChatMessage {
   statements: string[];
 
   /**
+   * SPARQL, written by the chat agent alongside its answer, returning the
+   * lowest-level objects the answer is based on (with geometries) so the
+   * user can visually audit it on a map. Only present when the agent set
+   * mapIt (mappable); absent on messages saved before this field existed.
+   */
+  mapStatement?: string | null;
+
+  /**
    * Optional chain-of-thought / rationale the model produced alongside its
    * answer. When present, the UI surfaces it via a hover popup instead of
    * showing it inline with the response.
@@ -40,6 +48,7 @@ export interface ServerChatResponse {
   location?: string;
   reasoning?: string;
   statements: string[];
+  mapStatement?: string | null;
 }
 
 export interface TypeSummary {
@@ -86,6 +95,7 @@ export interface Fact {
   description: string;
   text: string;
   statements: string[];
+  mapStatement?: string | null;
   projectId?: number | null;
   projectName?: string;
 }

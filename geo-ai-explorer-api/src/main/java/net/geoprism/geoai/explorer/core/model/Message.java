@@ -30,4 +30,11 @@ public class Message
 
   private List<String> statements;
 
+  /**
+   * SPARQL returning the lowest-level objects behind this answer, with
+   * geometries, so the user can visually audit the answer on a map. Written by
+   * the chat agent, never executed by it.
+   */
+  private String       mapStatement;
+
 }
