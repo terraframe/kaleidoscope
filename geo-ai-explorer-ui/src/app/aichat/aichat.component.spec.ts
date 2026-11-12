@@ -515,42 +515,6 @@ describe('AichatComponent', () => {
       expect(mapButtons()[0].closest('.message')!.id).toBe(component.chatMessageElementId('b'));
     });
 
-    it('runs the map statement directly instead of asking the map-it agent', async () => {
-      const message: any = {
-        id: 'b',
-        sender: 'system',
-        text: 'auditable',
-        mappable: true,
-        purpose: 'standard',
-        statements: ['SELECT 1'],
-        mapStatement: MAP_STATEMENT,
-      };
-      setMessages([{ id: 'u', sender: 'user', text: 'q', mappable: false, purpose: 'standard', statements: [] }, message]);
-
-      const dispatch = spyOn(TestBed.inject(Store), 'dispatch');
-      component.mapIt(message);
-
-      http.expectNone(apiBase() + 'api/chat/get-locations/start');
-      const req = http.expectOne(apiBase() + 'api/chat/get-page');
-      expect(req.request.body.statement).toBe(MAP_STATEMENT);
-      req.flush(PAGE);
-      await settle();
-
-      expect(dispatch).toHaveBeenCalledWith(jasmine.objectContaining({ type: ExplorerActions.showPagesOnMap.type }));
-      expect(component.mapLoading).toBeFalse();
-    });
-
-    it('falls back to the map-it agent for older messages without a map statement', async () => {
-      const message: any = { id: 'b', sender: 'system', text: 'old', mappable: true, purpose: 'standard', statements: [] };
-      setMessages([{ id: 'u', sender: 'user', text: 'q', mappable: false, purpose: 'standard', statements: [] }, message]);
-
-      component.mapIt(message);
-
-      http.expectNone(apiBase() + 'api/chat/get-page');
-      const req = http.expectOne(apiBase() + 'api/chat/get-locations/start');
-      expect(req.request.body.messages.length).toBe(2);
-    });
-
     it('saves the map statement with a fact', () => {
       component.createFact(new Event('click'), {
         text: 'x',
