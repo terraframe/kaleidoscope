@@ -621,12 +621,6 @@
                             <fa-icon [icon]="mapIcon"></fa-icon>
                             View on Map
                           </p-button>
-                          @if (msg.savedQueryIndex; as savedIndex) {
-                            <p-button severity="secondary" (onClick)="mapIt(msg)">
-                              <fa-icon [icon]="saveQueryIcon"></fa-icon>
-                              <span>Saved Query #{{ savedIndex }}</span>
-                            </p-button>
-                          }
                         }
                       </div>
                       @if (msg.ambiguous && last) {

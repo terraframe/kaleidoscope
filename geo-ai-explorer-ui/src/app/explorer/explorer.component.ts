@@ -8,27 +8,16 @@ import {
   GeoJSONSource,
   LngLatBoundsLike,
   MapGeoJSONFeature,
-  Source,
   Popup,
 } from 'maplibre-gl';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
-import JSON5 from 'json5';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { PanelModule } from 'primeng/panel';
 import { ToastModule } from 'primeng/toast';
 import { CheckboxModule } from 'primeng/checkbox';
-import {
-  combineLatest,
-  combineLatestAll,
-  distinctUntilChanged,
-  Observable,
-  Subscription,
-  switchMap,
-  take,
-  withLatestFrom,
-} from 'rxjs';
+import { combineLatest, distinctUntilChanged, Observable, Subscription, take, withLatestFrom } from 'rxjs';
 import { Store } from '@ngrx/store';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -52,7 +41,6 @@ import {
   getVectorLayers,
   getZoomMap,
   highlightedObject,
-  getWorkflowStep,
   WorkflowStep,
   getPages,
   getWorkflowState,
@@ -130,7 +118,6 @@ export class ExplorerComponent implements OnInit, OnDestroy {
   public forwardIcon = faArrowRight;
   public minimizeIcon = faDownLeftAndUpRightToCenter;
   public upsizeIcon = faUpRightAndDownLeftFromCenter;
-  public saveQueryIcon = faFloppyDisk;
   public hideAttributesIcon = faAnglesLeft;
   public showAttributesIcon = faAnglesRight;
   public relationshipIcon = faShareNodes;
@@ -170,8 +157,6 @@ export class ExplorerComponent implements OnInit, OnDestroy {
   pages$: Observable<LocationPage[]> = this.store.select(getPages);
 
   onPageChange: Subscription;
-
-  onSavedQueriesChange: Subscription;
 
   onUrlStateChange?: Subscription;
 
@@ -263,10 +248,6 @@ export class ExplorerComponent implements OnInit, OnDestroy {
   ];
 
   private currentPageCacheId?: string;
-
-  public canSaveCurrentQueryValue = false;
-  public currentSavedQueryIndexValue: number | null = null;
-  public currentSavedQueryValue: CachedExplorerPages | null = null;
 
   private restoringFromUrl = false;
 
@@ -369,7 +350,6 @@ export class ExplorerComponent implements OnInit, OnDestroy {
 
           if (data?.pageCacheId) {
             this.currentPageCacheId = data.pageCacheId;
-            this.updateCurrentQueryState();
           }
 
           this.scheduleRender();
@@ -394,13 +374,8 @@ export class ExplorerComponent implements OnInit, OnDestroy {
         //     // this.currentPageCacheId = this.explorerSessionState.cachePages(pages, 'unknown', this.currentPageCacheId);
         // }
 
-        this.updateCurrentQueryState();
         this.scheduleRender();
       });
-
-    this.onSavedQueriesChange = this.explorerSessionState.savedQueries$.subscribe(() => {
-      this.updateCurrentQueryState();
-    });
   }
 
   ngOnInit(): void {
@@ -432,7 +407,6 @@ export class ExplorerComponent implements OnInit, OnDestroy {
     this.onSelectedObjectChange.unsubscribe();
     this.onWorkflowStepChange.unsubscribe();
     this.onPageChange.unsubscribe();
-    this.onSavedQueriesChange.unsubscribe();
     this.onUrlStateChange?.unsubscribe();
   }
 
@@ -454,7 +428,6 @@ export class ExplorerComponent implements OnInit, OnDestroy {
 
     if (!view) {
       this.currentPageCacheId = undefined;
-      this.updateCurrentQueryState();
       this.store.dispatch(ExplorerActions.setWorkflowStep({ step: WorkflowStep.FullScreenChat }));
       this.restoringFromUrl = false;
       return;
@@ -462,12 +435,10 @@ export class ExplorerComponent implements OnInit, OnDestroy {
 
     if (pageCacheId) {
       this.currentPageCacheId = pageCacheId;
-      this.updateCurrentQueryState();
     }
 
     if (view === 'chat') {
       this.currentPageCacheId = undefined;
-      this.updateCurrentQueryState();
       this.store.dispatch(ExplorerActions.setWorkflowStep({ step: WorkflowStep.FullScreenChat }));
       this.restoringFromUrl = false;
       return;
@@ -671,29 +642,6 @@ export class ExplorerComponent implements OnInit, OnDestroy {
 
   hasResults(pages: LocationPage[] | null | undefined): boolean {
     return (pages ?? []).some((page) => (page.locations?.length ?? 0) > 0 || page.count > 0);
-  }
-
-  canSaveCurrentQuery(): boolean {
-    return this.currentPageCacheId != null && this.hasResults(this.pages);
-  }
-
-  currentSavedQueryIndex(): number | null {
-    return this.explorerSessionState.getSavedQueryIndex(this.currentPageCacheId);
-  }
-
-  private updateCurrentQueryState(): void {
-    this.canSaveCurrentQueryValue = this.canSaveCurrentQuery();
-    this.currentSavedQueryIndexValue = this.currentPageCacheId
-      ? this.explorerSessionState.getSavedQueryIndex(this.currentPageCacheId)
-      : null;
-    this.currentSavedQueryValue =
-      this.currentSavedQueryIndexValue != null && this.currentPageCacheId
-        ? this.explorerSessionState.getCachedPages(this.currentPageCacheId)
-        : null;
-  }
-
-  currentSavedQuery(): CachedExplorerPages | null {
-    return this.currentSavedQueryValue;
   }
 
   reloadPage(): void {

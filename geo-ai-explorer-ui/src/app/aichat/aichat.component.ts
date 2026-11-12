@@ -82,7 +82,6 @@ interface ProjectChoice {
 
 interface RenderedChatMessage extends ChatMessage {
   renderedHtml: string;
-  savedQueryIndex: number | null;
 }
 
 @Component({
@@ -133,9 +132,7 @@ export class AichatComponent {
 
   workflowStep$: Observable<WorkflowStep> = this.store.select(getWorkflowStep);
   workflowData$: Observable<any> = this.store.select(getWorkflowData);
-  savedQueries$: Observable<CachedExplorerPages[]>;
   onWorkflowStepChange: Subscription;
-  onSavedQueriesChange: Subscription;
   onReportTemplatesChange: Subscription;
 
   public conversations: ChatConversation[] = [];
@@ -215,12 +212,7 @@ export class AichatComponent {
     private factService: FactService,
     private projectService: ProjectService
   ) {
-    this.savedQueries$ = this.explorerSessionState.savedQueries$;
     this.activeSidebarTab = this.loadActiveSidebarTab();
-    this.onSavedQueriesChange = this.savedQueries$.subscribe((savedQueries) => {
-      this.savedQueryIndexById = new Map(savedQueries.map((query, index) => [query.id, index + 1]));
-      this.refreshRenderedMessages();
-    });
 
     this.loadConversations();
     this.reconcilePendingJobs();
@@ -254,7 +246,6 @@ export class AichatComponent {
 
   ngOnDestroy(): void {
     this.onWorkflowStepChange.unsubscribe();
-    this.onSavedQueriesChange.unsubscribe();
     this.onReportTemplatesChange.unsubscribe();
   }
 
@@ -462,7 +453,6 @@ export class AichatComponent {
     return {
       ...message,
       renderedHtml: message.sender === 'system' ? this.renderMarkdown(parsedText) : parsedText,
-      savedQueryIndex: null,
     };
   }
 
@@ -1033,7 +1023,7 @@ export class AichatComponent {
       .fullTextLookup(message.location!)
       .then((page) => {
         const pageCacheId = this.explorerSessionState.getOrCreateFullTextLookupId(message.location!);
-        this.explorerSessionState.cachePages([page], 'full-text-disambiguation', pageCacheId, message.location);
+        this.explorerSessionState.cachePages([page], pageCacheId, message.location);
 
         this.store.dispatch(
           ExplorerActions.setPages({
