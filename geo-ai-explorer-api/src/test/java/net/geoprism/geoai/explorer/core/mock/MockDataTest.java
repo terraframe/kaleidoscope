@@ -4,6 +4,7 @@ import java.util.List;
 
 import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.entity.Project;
+import net.geoprism.geoai.explorer.core.model.Location;
 import net.geoprism.geoai.explorer.core.model.ReportTemplate;
 import net.geoprism.geoai.explorer.core.model.Section;
 
@@ -85,5 +86,12 @@ public abstract class MockDataTest
         .project(project) //
         .build();
   }
+  
+  protected Location location(String code, String label, String type)
+  {
+    return new Location("https://localhost/graph#Structure-" + code, type, code, label, null);
+  }
+
+
 
 }

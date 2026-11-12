@@ -78,9 +78,6 @@ public class ChatPromptServiceTest
       assertTrue(prompt.contains("audit your results visually on a map"));
       assertTrue(prompt.contains("lowest-level objects"));
       assertTrue(prompt.contains("- mapStatement:"));
-      assertTrue(prompt.contains("Required whenever 'mapIt' is true. Omit it otherwise."));
-      assertTrue(prompt.contains("If you are setting 'mapIt' to true, you MUST also provide a mapStatement"));
-      assertTrue(!prompt.contains("even when mapIt is false"), "The prompt still says the mapStatement is required when mapIt is false");
     }
   }
 

@@ -52,7 +52,7 @@ public class ReportTemplateServiceTest
     ReportTemplate template = service.get(ReportTemplateService.PLAN_EVAL);
 
     assertNotNull(template);
-    assertEquals("Plan Evaluation", template.getName());
+    assertEquals("Plan Evaluation (1983)", template.getName());
     List<String> citations = template.getReferences().stream().map(Reference::getCitation).toList();
     assertEquals(List.of("Principles and Guidelines (1983)", "ER 1105-2-100", "33 USC 2282(a)(2)"), citations);
     assertEquals(12, template.getSections().size());

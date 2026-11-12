@@ -50,11 +50,6 @@ public class LocationServiceTest extends MockDataTest
   @MockitoBean
   private GraphQueryService   graph;
 
-  private static Location location(String code, String label)
-  {
-    return new Location("https://localhost/graph#Structure-" + code, TYPE, code, label, null);
-  }
-
   // ---------------------------------------------------------------------------
   // getPage
   // ---------------------------------------------------------------------------
@@ -62,7 +57,7 @@ public class LocationServiceTest extends MockDataTest
   @Test
   public void testGetPage_WithType_FiltersByTypeAndInjectsAttributes()
   {
-    List<Location> locations = List.of(location("1", "One"), location("2", "Two"));
+    List<Location> locations = List.of(location("1", "One", TYPE), location("2", "Two", TYPE));
 
     when(graph.buildTypeFilterQuery(STATEMENT, TYPE)).thenReturn(TYPE_STATEMENT);
     when(graph.query(TYPE_STATEMENT, 10, 20, "label", "ASC")).thenReturn(locations);
@@ -89,7 +84,7 @@ public class LocationServiceTest extends MockDataTest
   public void testGetPage_WithoutType_ExcludesTypesAndReturnsTypeCounts()
   {
     List<String> excluded = List.of("FloodScenario");
-    List<Location> locations = List.of(location("1", "One"));
+    List<Location> locations = List.of(location("1", "One", TYPE));
     List<TypeSummary> types = List.of(new TypeSummary());
 
     when(graph.buildExcludedTypesQuery(STATEMENT, excluded)).thenReturn(EXCLUDED_STATEMENT);
@@ -146,7 +141,7 @@ public class LocationServiceTest extends MockDataTest
   @Test
   public void testExportPageCsv_WithType_UsesCountAsLimitAndInjectsAttributes()
   {
-    Location location = location("2012X", "Building");
+    Location location = location("2012X", "Building", TYPE);
     location.addProperty("value", 431826);
 
     when(graph.buildTypeFilterQuery(STATEMENT, TYPE)).thenReturn(TYPE_STATEMENT);
@@ -174,7 +169,7 @@ public class LocationServiceTest extends MockDataTest
   {
     when(graph.buildExcludedTypesQuery(STATEMENT, List.of("Excluded"))).thenReturn(EXCLUDED_STATEMENT);
     when(graph.getCount(EXCLUDED_STATEMENT)).thenReturn(1L);
-    when(graph.query(EXCLUDED_STATEMENT, 0, 1, null, null)).thenReturn(List.of(location("1", "One")));
+    when(graph.query(EXCLUDED_STATEMENT, 0, 1, null, null)).thenReturn(List.of(location("1", "One", TYPE)));
 
     service.exportPageCsv(STATEMENT, null, List.of("Excluded"), null, null);
 
@@ -197,7 +192,7 @@ public class LocationServiceTest extends MockDataTest
   @Test
   public void testExportPageCsv_ExcludesGeometryColumns()
   {
-    Location location = location("1", "One");
+    Location location = location("1", "One", TYPE);
     location.addProperty("wkt", "POINT (1 2)");
     location.addProperty("geometry", "geo");
     location.addProperty("geom", "geo");
