@@ -93,42 +93,6 @@ export class ChatService {
     };
   }
 
-  getLocations(messages: ChatMessage[], offset: number, limit: number): Promise<LocationPage[]> {
-    const cacheId = this.explorerSessionState.getOrCreateLocationsRequestId(messages, offset, limit);
-    const cachedPages = this.explorerSessionState.getPages(cacheId);
-
-    if (cachedPages) {
-      return Promise.resolve(cachedPages);
-    }
-
-    if (environment.mockRequests) {
-      return new Promise<LocationPage[]>((resolve) => {
-        setTimeout(() => {
-          resolve([MockUtil.locations]);
-        }, 500); // Simulating network delay
-      }).then((pages) => {
-        this.explorerSessionState.cachePages(pages, 'chat-mapit', cacheId);
-        return pages;
-      });
-    } else {
-      const params = {
-        messages: messages.map((message) => ({
-          type: message.sender === 'user' ? 'USER' : 'AI',
-          content: message.text,
-        })),
-        limit,
-        offset,
-      };
-
-      return firstValueFrom(this.http.post<JobStartResponse>(apiBase() + 'api/chat/get-locations/start', params))
-        .then(({ jobId }) => pollJob<LocationPage[]>(this.http, apiBase() + 'api/chat/get-locations/status/' + jobId))
-        .then((pages) => {
-          this.explorerSessionState.cachePages(pages, 'chat-mapit', cacheId);
-          return pages;
-        });
-    }
-  }
-
   getPage(
     statement: string,
     type: string | null,

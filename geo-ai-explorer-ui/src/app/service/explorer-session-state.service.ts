@@ -100,20 +100,6 @@ export class ExplorerSessionStateService {
     ].join('.');
   }
 
-  getOrCreateLocationsRequestId(messages: ChatMessage[], offset: number, limit: number): string {
-    const key = JSON.stringify({
-      messages: messages.map((message) => ({
-        sender: message.sender,
-        text: message.text,
-        purpose: message.purpose,
-      })),
-      offset,
-      limit,
-    });
-
-    return ['locations-query', this.hash(key)].join('.');
-  }
-
   getOrCreateFullTextLookupId(query: string): string {
     return ['full-text', this.hash(query)].join('.');
   }
