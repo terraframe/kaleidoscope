@@ -1,8 +1,5 @@
 import { ChatMessage, LocationPage } from './models/chat.model';
 import { Configuration } from './models/configuration.model';
-import { GeoObject } from './models/geoobject.model';
-import { Style } from './models/style.model';
-import { ExplorerInit } from './service/explorer.service';
 
 export class MockUtil {
   private static loremSentences: string[] = [
@@ -172,8 +169,6 @@ As well as numerous census tracts, real properties, and other infrastructure.`,
       statements: [],
     },
   ];
-
-  public static explorerInit: ExplorerInit = {};
 
   public static locations: LocationPage = {
     statement: 'A list of available locations',

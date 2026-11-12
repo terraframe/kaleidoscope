@@ -370,10 +370,6 @@ export class ExplorerComponent implements OnInit, OnDestroy {
         this.pages = pages;
         this.updateGeoObjectIndex();
 
-        // if (this.hasResults(pages)) {
-        //     // this.currentPageCacheId = this.explorerSessionState.cachePages(pages, 'unknown', this.currentPageCacheId);
-        // }
-
         this.scheduleRender();
       });
   }

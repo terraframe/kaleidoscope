@@ -2,7 +2,6 @@ package net.geoprism.geoai.explorer.core.service.search;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.jena.query.ParameterizedSparqlString;
 import org.apache.jena.query.QueryExecution;

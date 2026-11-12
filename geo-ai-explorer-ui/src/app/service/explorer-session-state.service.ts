@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { v4 as uuidv4 } from 'uuid';
 
-import { ChatMessage, LocationPage } from '../models/chat.model';
+import { LocationPage } from '../models/chat.model';
 
 export interface CachedExplorerPages {
   id: string;
@@ -9,7 +9,6 @@ export interface CachedExplorerPages {
   updatedAt: number;
   accessedAt: number;
   pages: LocationPage[];
-  title?: string;
 }
 
 @Injectable({
@@ -21,11 +20,7 @@ export class ExplorerSessionStateService {
   private readonly maxSessionCaches = 25;
   private readonly maxQuotaWriteAttempts = 12;
 
-  cachePages(pages: LocationPage[], id: string = uuidv4(), title?: string): string {
-    if (!this.hasResults(pages)) {
-      return id;
-    }
-
+  cachePages(pages: LocationPage[], id: string = uuidv4()): string {
     const existing = this.getCache(id);
 
     const cache: CachedExplorerPages = {
@@ -34,7 +29,6 @@ export class ExplorerSessionStateService {
       updatedAt: Date.now(),
       accessedAt: Date.now(),
       pages,
-      title,
     };
 
     try {
@@ -50,10 +44,6 @@ export class ExplorerSessionStateService {
     }
 
     return id;
-  }
-
-  hasResults(pages: LocationPage[] | null | undefined): boolean {
-    return (pages ?? []).some((page) => (page.count ?? 0) > 0 || (page.locations?.length ?? 0) > 0);
   }
 
   getPages(id: string | null | undefined): LocationPage[] | null {
@@ -121,12 +111,6 @@ export class ExplorerSessionStateService {
     });
 
     return Array.from(caches.values()).sort((a, b) => b.updatedAt - a.updatedAt);
-  }
-
-  listSavedPages(): CachedExplorerPages[] {
-    return this.collectCaches(localStorage, this.savedPrefix)
-      .map((cache) => ({ ...cache, saved: true }))
-      .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   getCachedPages(id: string): CachedExplorerPages | null {

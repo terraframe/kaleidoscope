@@ -15,32 +15,29 @@
  */
 package net.geoprism.geoai.explorer.web.controller;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import net.geoprism.geoai.explorer.core.model.JobStatusResponse;
-import net.geoprism.geoai.explorer.core.model.LocationPage;
 import net.geoprism.geoai.explorer.core.model.Message;
-import net.geoprism.geoai.explorer.core.model.PageRequest;
 import net.geoprism.geoai.explorer.core.model.PromptRequest;
 import net.geoprism.geoai.explorer.core.service.AsyncJobService;
 import net.geoprism.geoai.explorer.core.service.ChatService;
 
 @RestController
 @Validated
+@RequestMapping("/api/chat")
 public class ChatController
 {
   @Autowired
@@ -49,7 +46,7 @@ public class ChatController
   @Autowired
   private AsyncJobService jobs;
 
-  @PostMapping("/api/chat/prompt")
+  @PostMapping("/prompt")
   @ResponseBody
   public ResponseEntity<Message> prompt(@RequestBody PromptRequest request)
   {
@@ -66,7 +63,7 @@ public class ChatController
    * work off in the background (see AsyncJobService) and immediately hands
    * the caller a job id to poll via promptStatus() below.
    */
-  @PostMapping("/api/chat/prompt/start")
+  @PostMapping("/prompt/start")
   @ResponseBody
   public ResponseEntity<Map<String, String>> startPrompt(@RequestBody PromptRequest request)
   {
@@ -75,42 +72,11 @@ public class ChatController
     return new ResponseEntity<Map<String, String>>(Map.of("jobId", jobId), HttpStatus.ACCEPTED);
   }
 
-  @GetMapping("/api/chat/prompt/status/{jobId}")
+  @GetMapping("/prompt/status/{jobId}")
   @ResponseBody
   public ResponseEntity<JobStatusResponse> promptStatus(@PathVariable(name = "jobId") String jobId)
   {
     return new ResponseEntity<JobStatusResponse>(this.jobs.getStatus(jobId), HttpStatus.OK);
-  }
-
-  @PostMapping("/api/chat/get-page")
-  @ResponseBody
-  public ResponseEntity<LocationPage> getPage(@RequestBody PageRequest page)
-  {
-    LocationPage response = this.service.getPage(page.getStatement(), page.getType(), page.getOffset(), page.getLimit(), page.getExcludedTypes(), page.getSortField(), page.getSortDirection());
-
-    return new ResponseEntity<LocationPage>(response, HttpStatus.OK);
-  }
-
-  @PostMapping("/api/chat/export-page")
-  @ResponseBody
-  public ResponseEntity<byte[]> exportPage(@RequestBody PageRequest page)
-  {
-    String csv = this.service.exportPageCsv(page.getStatement(), page.getType(), page.getExcludedTypes(), page.getSortField(), page.getSortDirection());
-    String filename = sanitizeFilename(page.getType() == null || page.getType().isBlank() ? "results" : page.getType()) + ".csv";
-
-    return ResponseEntity.ok()
-        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-        .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
-        .body(csv.getBytes(StandardCharsets.UTF_8));
-  }
-
-  private static String sanitizeFilename(String filename)
-  {
-    return filename
-        .replaceAll("^.*[#/]", "")
-        .replaceAll("[^A-Za-z0-9._-]+", "_")
-        .replaceAll("_+", "_")
-        .replaceAll("^_|_$", "");
   }
 
   /*

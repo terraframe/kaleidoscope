@@ -3,11 +3,10 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 
-import { ChatMessage, JobStartResponse, LocationPage, ServerChatResponse } from '../models/chat.model';
+import { ChatMessage, JobStartResponse, ServerChatResponse } from '../models/chat.model';
 import { MockUtil } from '../mock-util';
 import { environment } from '../../environments/environment';
 import { apiBase } from './url.util';
-import { ExplorerSessionStateService } from './explorer-session-state.service';
 import { pollJob } from './job-polling.util';
 
 @Injectable({
@@ -27,10 +26,7 @@ export class ChatService {
    * driven off that Promise needs no changes.
    */
 
-  constructor(
-    private http: HttpClient,
-    private explorerSessionState: ExplorerSessionStateService
-  ) {}
+  constructor(private http: HttpClient) {}
 
   /**
    * @param onJobStarted Invoked synchronously (before the job completes)
@@ -91,83 +87,5 @@ export class ChatService {
       statements: response.statements,
       mapStatement: response.mapStatement ?? null,
     };
-  }
-
-  getPage(
-    statement: string,
-    type: string | null,
-    offset: number,
-    limit: number,
-    excludedTypes: string[] = [],
-    sortField?: string | null,
-    sortDirection?: 'asc' | 'desc' | null
-  ): Promise<LocationPage> {
-    const cacheId = this.explorerSessionState.getOrCreatePageRequestId(
-      statement,
-      type,
-      offset,
-      limit,
-      excludedTypes,
-      sortField,
-      sortDirection
-    );
-
-    const cachedPages = this.explorerSessionState.getPages(cacheId);
-    const cachedPage = cachedPages?.[0];
-
-    if (cachedPage) {
-      return Promise.resolve(cachedPage);
-    }
-
-    if (environment.mockRequests) {
-      return new Promise<LocationPage>((resolve) => {
-        setTimeout(() => {
-          resolve(MockUtil.locations);
-        }, 500); // Simulating network delay
-      }).then((page) => {
-        this.explorerSessionState.cachePages([page], 'page-query', cacheId);
-        return page;
-      });
-    } else {
-      // // // Uncomment below to make a real HTTP request
-      const params = {
-        statement,
-        type,
-        limit,
-        offset,
-        excludedTypes,
-        sortField,
-        sortDirection,
-      };
-
-      return firstValueFrom(this.http.post<LocationPage>(apiBase() + 'api/chat/get-page', params)).then((page) => {
-        this.explorerSessionState.cachePages([page], 'page-query', cacheId);
-        return page;
-      });
-    }
-  }
-
-  exportPage(
-    statement: string,
-    type: string | null,
-    excludedTypes: string[] = [],
-    sortField?: string | null,
-    sortDirection?: 'asc' | 'desc' | null
-  ): Promise<Blob> {
-    const params = {
-      statement,
-      type,
-      limit: 0,
-      offset: 0,
-      excludedTypes,
-      sortField,
-      sortDirection,
-    };
-
-    return firstValueFrom(
-      this.http.post(apiBase() + 'api/chat/export-page', params, {
-        responseType: 'blob',
-      })
-    );
   }
 }

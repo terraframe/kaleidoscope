@@ -6,15 +6,23 @@ import { Edge, Node, GraphComponent, GraphModule, NgxGraphStates, NgxGraphStateC
 import { SELECTED_COLOR } from '../explorer/defaultQueries';
 import { ExplorerService } from '../service/explorer.service';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
-import ColorGen from "../util/color-generator";
+import ColorGen from '../util/color-generator';
 import { GeoObject } from '../models/geoobject.model';
 import { Store } from '@ngrx/store';
-import { ExplorerActions, getSelectedObject, getStyles, getWorkflowState, getZoomMap, highlightedObject, WorkflowState, WorkflowStep } from '../state/explorer.state';
+import {
+  ExplorerActions,
+  getSelectedObject,
+  getStyles,
+  getWorkflowState,
+  getZoomMap,
+  highlightedObject,
+  WorkflowState,
+  WorkflowStep,
+} from '../state/explorer.state';
 import { distinctUntilChanged, Observable, Subscription } from 'rxjs';
 import { CheckboxModule } from 'primeng/checkbox';
 import { FormsModule } from '@angular/forms';
 import { StyleConfig } from '../models/style.model';
-
 
 // export interface Relationship {
 //   oid: string,
@@ -43,22 +51,22 @@ import { StyleConfig } from '../models/style.model';
 // }
 
 export interface GprGraph {
-  typeCount: { [key: string]: number },
-  nodes: GeoObject[],
-  edges: { source: string, target: string, type: string }[]
+  typeCount: { [key: string]: number };
+  nodes: GeoObject[];
+  edges: { source: string; target: string; type: string }[];
 }
 
 export interface TreeData {
-  edges: Edge[],
-  nodes: Node[],
+  edges: Edge[];
+  nodes: Node[];
   // relatedTypes: RelatedType[]
 }
 
 export const DRAW_SCALE_MULTIPLIER: number = 1.0;
 
-export const GRAPH_GO_LABEL_COLOR: string = "black";
-export const GRAPH_CIRCLE_FILL: string = "#999";
-export const GRAPH_LINE_COLOR: string = "#999";
+export const GRAPH_GO_LABEL_COLOR: string = 'black';
+export const GRAPH_CIRCLE_FILL: string = '#999';
+export const GRAPH_LINE_COLOR: string = '#999';
 
 export const COLLAPSE_ANIMATION_TIME: number = 500; // in ms
 
@@ -68,8 +76,8 @@ export const DIMENSIONS = {
   PADDING: {
     BETWEEN_NODES: 0,
     NODE_LABEL: 5,
-    NODE_EDGE: 5
-  }
+    NODE_EDGE: 5,
+  },
 };
 
 @Component({
@@ -77,15 +85,14 @@ export const DIMENSIONS = {
   imports: [CommonModule, GraphModule, ProgressSpinnerModule, CheckboxModule, FormsModule],
   providers: [],
   templateUrl: './graph-explorer.component.html',
-  styleUrl: './graph-explorer.component.scss'
+  styleUrl: './graph-explorer.component.scss',
 })
 export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
-
   @Input() explorer!: ExplorerComponent;
 
-  @ViewChild("graph") graph!: GraphComponent;
+  @ViewChild('graph') graph!: GraphComponent;
 
-  @ViewChild("graphContainer") set graphContainerRef(ref: ElementRef<HTMLElement> | undefined) {
+  @ViewChild('graphContainer') set graphContainerRef(ref: ElementRef<HTMLElement> | undefined) {
     this.graphContainer = ref;
     this.observeGraphContainer();
     this.scheduleResizeRefresh();
@@ -93,7 +100,7 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
 
   private store = inject(Store);
 
-  private HASH_TAG_REPLACEMENT = "-!`~`!-";
+  private HASH_TAG_REPLACEMENT = '-!`~`!-';
 
   public DIMENSIONS = DIMENSIONS;
 
@@ -108,7 +115,7 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   // public geoObjects?: GeoObject[];
   public data?: TreeData;
 
-  public relationship: any = { layout: "HORIZONTAL" }
+  public relationship: any = { layout: 'HORIZONTAL' };
 
   private extraColors: any = {};
 
@@ -125,7 +132,7 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   onHighlightedObjectChange: Subscription;
 
   workflowState$: Observable<WorkflowState> = this.store.select(getWorkflowState);
-      
+
   onWorkflowStateChange: Subscription;
 
   selectedObject$: Observable<GeoObject | null> = this.store.select(getSelectedObject);
@@ -144,23 +151,20 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   private resizeObserver?: ResizeObserver;
   private resizeRefreshFrame = 0;
 
-  constructor(
-    private queryService: ExplorerService
-  ) {
-
-    this.onHighlightedObjectChange = this.highlightedObject$.subscribe(object => {
+  constructor(private queryService: ExplorerService) {
+    this.onHighlightedObjectChange = this.highlightedObject$.subscribe((object) => {
       if (object) {
         this.highlightedObject = object;
       }
     });
 
-    this.onStylesChange = this.styles$.subscribe(styles => {
+    this.onStylesChange = this.styles$.subscribe((styles) => {
       this.resolvedStyles = styles;
     });
 
     this.onSelectedObjectChange = this.selectedObject$
       .pipe(distinctUntilChanged((a, b) => a?.properties.uri === b?.properties.uri))
-      .subscribe(object => {
+      .subscribe((object) => {
         if (object) {
           this.renderGeoObjectAndNeighbors(object);
         } else {
@@ -169,26 +173,22 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
       });
 
     this.onWorkflowStateChange = this.workflowState$
-        .pipe(
-            distinctUntilChanged((a, b) =>
-            a.step === b.step &&
-            a.data === b.data
-            )
-        )
-        .subscribe(({ step, data }) => {
-          if (this.gprGraph != null && step === WorkflowStep.ViewNeighbors) {
-            let that = this;
-            window.setTimeout(() => {
-              if (this.gprGraph != null && step === WorkflowStep.ViewNeighbors)
-                this.renderGraph(that.gprGraph!, false)
-            }, 100);
-          } else if (step !== WorkflowStep.MapAndResults &&
-            step !== WorkflowStep.MinimizeChat &&
-            step !== WorkflowStep.InspectObject) {
-            // Hmm.. seems kinda sketch
-            this.store.dispatch(ExplorerActions.setNeighbors({ objects: [], zoomMap: false }));
-          }
-        });
+      .pipe(distinctUntilChanged((a, b) => a.step === b.step && a.data === b.data))
+      .subscribe(({ step, data }) => {
+        if (this.gprGraph != null && step === WorkflowStep.ViewNeighbors) {
+          let that = this;
+          window.setTimeout(() => {
+            if (this.gprGraph != null && step === WorkflowStep.ViewNeighbors) this.renderGraph(that.gprGraph!, false);
+          }, 100);
+        } else if (
+          step !== WorkflowStep.MapAndResults &&
+          step !== WorkflowStep.MinimizeChat &&
+          step !== WorkflowStep.InspectObject
+        ) {
+          // Hmm.. seems kinda sketch
+          this.store.dispatch(ExplorerActions.setNeighbors({ objects: [], zoomMap: false }));
+        }
+      });
   }
 
   ngOnDestroy(): void {
@@ -212,32 +212,27 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   }
 
   public renderGeoObjectAndNeighbors(geoObject: GeoObject, forceRefresh: boolean = false) {
-    if (this.selectedObject != null && (this.selectedObject.properties.uri === geoObject.properties.uri && !forceRefresh)) return;
+    if (this.selectedObject != null && this.selectedObject.properties.uri === geoObject.properties.uri && !forceRefresh)
+      return;
 
     this.loading = true;
 
     this.selectedObject = geoObject;
 
-    // let sparql = defaultQueries[2].sparql.replace("{{uri}}", geoObject.properties.uri);
-    // const result: SPARQLResultSet = await this.queryService.query(sparql);
-    // this.geoObjects = this.queryService.convert(result);
-
-    // if (this.geoObjects.length === 0) {
-    //   console.error('The query did not return any results!');
-    //   return;
-    // }
-
-    // this.renderGeoObjects(explorer, this.geoObjects);
-
     const excludedTypes = Object.entries(this.getTypeLegend())
       .filter(([_, value]) => !value.included)
       .map(([key, _]) => key);
 
-    let graph = this.queryService.neighborQuery(geoObject.properties.uri, excludedTypes).then((graph) => {
-      this.renderGraph(graph, true);
+    this.queryService
+      .neighborQuery(geoObject.properties.uri, excludedTypes)
+      .then((graph) => {
+        this.renderGraph(graph, true);
 
-      // setTimeout(() => { this.zoomToUri(geoObject.properties.uri); }, 500);
-    }).finally(() => { this.loading = false; });
+        // setTimeout(() => { this.zoomToUri(geoObject.properties.uri); }, 500);
+      })
+      .finally(() => {
+        this.loading = false;
+      });
   }
 
   public renderGraph(graph: GprGraph | null, zoom: boolean = false) {
@@ -251,38 +246,39 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
 
     let data: any = {
       edges: [],
-      nodes: []
+      nodes: [],
     };
 
-    graph.nodes.forEach(go => {
-      if (!data.nodes.some((n:any) => this.idToUri(n.id) === go.properties.uri)) {
+    graph.nodes.forEach((go) => {
+      if (!data.nodes.some((n: any) => this.idToUri(n.id) === go.properties.uri)) {
         let node = {
-          label: (go.properties.label != null && go.properties.label !== "")
-            ? go.properties.label
-            : go.properties.uri.substring(go.properties.uri.lastIndexOf("#") + 1),
+          label:
+            go.properties.label != null && go.properties.label !== ''
+              ? go.properties.label
+              : go.properties.uri.substring(go.properties.uri.lastIndexOf('#') + 1),
           id: this.uriToId(go.properties.uri),
-          relation: graph.edges.some(edge => edge.source === go.properties.uri) ? "PARENT" : "CHILD",
-          type: go.properties.type
+          relation: graph.edges.some((edge) => edge.source === go.properties.uri) ? 'PARENT' : 'CHILD',
+          type: go.properties.type,
         };
         data.nodes.push(node);
       }
     });
 
-    graph.edges.forEach(edge => {
+    graph.edges.forEach((edge) => {
       let formattedEdge = {
         id: this.uriToId(Math.random().toString(16).slice(2)),
         source: this.uriToId(edge.source),
         target: this.uriToId(edge.target),
-        label: uriToLabel(edge.type)
+        label: uriToLabel(edge.type),
       };
       data.edges.push(formattedEdge);
     });
 
     // window.setTimeout(() => {
-      this.data = data;
-      // this.resizeDimensions();
-      // this.calculateTypeLegend(this.data.relatedTypes);
-      // this.addLayers(this.data.relatedTypes);
+    this.data = data;
+    // this.resizeDimensions();
+    // this.calculateTypeLegend(this.data.relatedTypes);
+    // this.addLayers(this.data.relatedTypes);
     // }, 100);
 
     this.resizeDimensions();
@@ -305,25 +301,27 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
         try {
           this.zoomToUri(this.selectedObject!.properties.uri);
         } finally {
-          window.setTimeout(() => { this.loading = false; }, 5);
+          window.setTimeout(() => {
+            this.loading = false;
+          }, 5);
         }
-      }, 1000); // We're very much guessing how long the graph can take to render here. On very slow computers it's possible this might not be long enough. Unfortunately ngx-graph does not provide a callback to listen to when the graph is finished.
-    else
-      this.loading = false;
+      }, 1000);
+    // We're very much guessing how long the graph can take to render here. On very slow computers it's possible this might not be long enough. Unfortunately ngx-graph does not provide a callback to listen to when the graph is finished.
+    else this.loading = false;
   }
 
   calculateTypeLegend() {
     var oldTypeLegend = JSON.parse(JSON.stringify(this.typeLegend));
     this.typeLegend = {};
 
-    Object.entries(this.gprGraph!.typeCount).forEach(kv => {
-        const style = this.resolvedStyles[kv[0]];
-        this.typeLegend[kv[0]] = {
-            label: style?.label ?? uriToLabel(kv[0]),
-            color: style?.color ?? ColorGen().hexString(),
-            visible: (oldTypeLegend[kv[0]] == null ? true : oldTypeLegend[kv[0]].visible),
-            included: (oldTypeLegend[kv[0]] == null ? true : oldTypeLegend[kv[0]].included)
-        }
+    Object.entries(this.gprGraph!.typeCount).forEach((kv) => {
+      const style = this.resolvedStyles[kv[0]];
+      this.typeLegend[kv[0]] = {
+        label: style?.label ?? uriToLabel(kv[0]),
+        color: style?.color ?? ColorGen().hexString(),
+        visible: oldTypeLegend[kv[0]] == null ? true : oldTypeLegend[kv[0]].visible,
+        included: oldTypeLegend[kv[0]] == null ? true : oldTypeLegend[kv[0]].included,
+      };
     });
   }
 
@@ -341,10 +339,8 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
 
     let legend = this.getTypeLegend();
 
-    if (legend[node.type] != null)
-      return legend[node.type].color;
-    else if (this.extraColors[node.type] != null)
-      return this.extraColors[node.type];
+    if (legend[node.type] != null) return legend[node.type].color;
+    else if (this.extraColors[node.type] != null) return this.extraColors[node.type];
     else {
       this.extraColors[node.type] = ColorGen().hexString();
       return this.extraColors[node.type];
@@ -358,7 +354,7 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   }
 
   uriToId(uri: string): string {
-    return "a" + uri;
+    return 'a' + uri;
   }
 
   idToUri(id: string): string {
@@ -420,35 +416,45 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   }
 
   // Thanks to https://stackoverflow.com/questions/52172067/create-svg-hexagon-points-with-only-only-a-length
-  public getHexagonPoints(node: { dimension: { width: number, height: number }, relation: string }): string {
-    let y = (this.DIMENSIONS.LABEL.HEIGHT / 2) - this.DIMENSIONS.NODE.HEIGHT / 2;
-    let x = (this.relationship.layout === "VERTICAL")
-      ? (node.relation === "CHILD" ? (this.DIMENSIONS.LABEL.WIDTH / 2) - this.DIMENSIONS.NODE.WIDTH / 2 : (this.DIMENSIONS.LABEL.WIDTH + DIMENSIONS.PADDING.NODE_LABEL + this.DIMENSIONS.NODE.WIDTH) / 2 - this.DIMENSIONS.NODE.WIDTH / 2)
-      : node.relation === "PARENT" ? (this.DIMENSIONS.LABEL.WIDTH + this.DIMENSIONS.PADDING.NODE_LABEL + this.DIMENSIONS.PADDING.NODE_EDGE) : 0;
+  public getHexagonPoints(node: { dimension: { width: number; height: number }; relation: string }): string {
+    let y = this.DIMENSIONS.LABEL.HEIGHT / 2 - this.DIMENSIONS.NODE.HEIGHT / 2;
+    let x =
+      this.relationship.layout === 'VERTICAL'
+        ? node.relation === 'CHILD'
+          ? this.DIMENSIONS.LABEL.WIDTH / 2 - this.DIMENSIONS.NODE.WIDTH / 2
+          : (this.DIMENSIONS.LABEL.WIDTH + DIMENSIONS.PADDING.NODE_LABEL + this.DIMENSIONS.NODE.WIDTH) / 2 -
+            this.DIMENSIONS.NODE.WIDTH / 2
+        : node.relation === 'PARENT'
+          ? this.DIMENSIONS.LABEL.WIDTH + this.DIMENSIONS.PADDING.NODE_LABEL + this.DIMENSIONS.PADDING.NODE_EDGE
+          : 0;
 
     let radius = this.DIMENSIONS.NODE.WIDTH / 2;
     let height = this.DIMENSIONS.NODE.HEIGHT;
     let width = this.DIMENSIONS.NODE.WIDTH;
 
-    let points = [0, 1, 2, 3, 4, 5, 6].map((n, i) => {
-      let angleDeg = 60 * i - 30;
-      let angleRad = Math.PI / 180 * angleDeg;
-      return [(width / 2 + radius * Math.cos(angleRad)) + x, (height / 2 + radius * Math.sin(angleRad)) + y];
-    }).map((p) => p.join(","))
-      .join(" ");
+    let points = [0, 1, 2, 3, 4, 5, 6]
+      .map((n, i) => {
+        let angleDeg = 60 * i - 30;
+        let angleRad = (Math.PI / 180) * angleDeg;
+        return [width / 2 + radius * Math.cos(angleRad) + x, height / 2 + radius * Math.sin(angleRad) + y];
+      })
+      .map((p) => p.join(','))
+      .join(' ');
 
     return points;
   }
 
   public onClickNode(node: any) {
-    let selectedObject = this.gprGraph!.nodes.find(n => n.properties.uri === this.idToUri(node.id));
+    let selectedObject = this.gprGraph!.nodes.find((n) => n.properties.uri === this.idToUri(node.id));
 
     if (selectedObject) {
-      this.store.dispatch(ExplorerActions.appendWorkflowStep({
-        step: WorkflowStep.InspectObject,
-        data: selectedObject,
-        zoomMap: true
-      }));
+      this.store.dispatch(
+        ExplorerActions.appendWorkflowStep({
+          step: WorkflowStep.InspectObject,
+          data: selectedObject,
+          zoomMap: true,
+        })
+      );
       this.renderGeoObjectAndNeighbors(selectedObject);
     }
   }
@@ -475,7 +481,7 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   // onZoomChanged(newZoom: number) {
   //   this.zoomJustChanged = true;
   //   console.log("Zoom changed");
-  
+
   //   setTimeout(() => {
   //     this.zoomJustChanged = false;
   //   }, 100);
@@ -484,9 +490,9 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   onGraphStateChange(event: NgxGraphStateChangeEvent) {
     if (!this.ignoreRecursive && this.graph && event.state === NgxGraphStates.Transform) {
       // if we’re coming out of a zoom, defer until the next frame…
-      
+
       if (!this.graph.isPanning) {
-        setTimeout(() => this.enforceBounds(),0);
+        setTimeout(() => this.enforceBounds(), 0);
       }
       // …otherwise (i.e. on a pan) run it *right now*
       else {
@@ -494,45 +500,39 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
         // setTimeout(() => this.enforceBounds(),0);
       }
 
-
-
       // setTimeout(() => this.enforceBounds(),0);
       // this.enforceBounds()
     }
   }
-  
+
   private enforceBounds() {
     this.graph.updateGraphDims();
     const zoom = this.graph.zoomLevel;
     const viewW = this.graph.dims.width;
     const viewH = this.graph.dims.height;
-  
+
     const graphW = this.graph.graphDims.width * zoom;
     const graphH = this.graph.graphDims.height * zoom;
-  
+
     const centerX = graphW <= viewW;
     const centerY = graphH <= viewH;
-  
+
     let clampedX = this.graph.panOffsetX;
     let clampedY = this.graph.panOffsetY;
-  
+
     if (!centerX) {
       clampedX = this.clamp(clampedX, viewW - graphW, 0);
     }
     if (!centerY) {
       clampedY = this.clamp(clampedY, viewH - graphH, 0);
     }
-  
+
     if (clampedX !== this.graph.panOffsetX || clampedY !== this.graph.panOffsetY || centerX || centerY) {
       this.ignoreRecursive = true;
-  
-      const worldX = centerX
-        ? this.graph.graphDims.width / 2
-        : (viewW / 2 - clampedX) / zoom;
-      const worldY = centerY
-        ? this.graph.graphDims.height / 2
-        : (viewH / 2 - clampedY) / zoom;
-  
+
+      const worldX = centerX ? this.graph.graphDims.width / 2 : (viewW / 2 - clampedX) / zoom;
+      const worldY = centerY ? this.graph.graphDims.height / 2 : (viewH / 2 - clampedY) / zoom;
+
       this.graph.panTo(worldX, worldY);
       this.ignoreRecursive = false;
       this.graph.updateGraphDims();
@@ -542,5 +542,4 @@ export class GraphExplorerComponent implements AfterViewInit, OnDestroy {
   clamp(val: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, val));
   }
-  
 }

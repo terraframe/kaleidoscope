@@ -28,8 +28,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import { ChatService } from '../service/chat-service.service';
-import { initialState, parseText } from '../state/chat.state';
-import { ChatMessage, Fact, LocationPage, Project } from '../models/chat.model';
+import { CachedPageResult, ExplorerCacheService } from '../service/explorer.cache.service';
+import { parseText } from '../state/chat.state';
+import { ChatMessage, Fact, Project } from '../models/chat.model';
 import { ErrorService } from '../service/error-service.service';
 import {
   ExplorerActions,
@@ -38,9 +39,8 @@ import {
   getWorkflowStep,
   WorkflowStep,
 } from '../state/explorer.state';
-import { ExplorerService } from '../service/explorer.service';
 import { GeoObject } from '../models/geoobject.model';
-import { CachedExplorerPages, ExplorerSessionStateService } from '../service/explorer-session-state.service';
+import { CachedExplorerPages } from '../service/explorer-session-state.service';
 import { ReportService } from '../service/report.service';
 import { ChatType, ReportSection, ReportSelection, ReportTemplate } from '../models/report.model';
 
@@ -182,7 +182,6 @@ export class AichatComponent {
   public sidebarWidthPx = this.loadSidebarWidth();
   private resizingSidebar = false;
   private markdownCache = new Map<string, string>();
-  private savedQueryIndexById = new Map<string, number>();
 
   /**
    * Matches the `#/internalLocationInspect/<uri>` links that parseText()
@@ -203,11 +202,10 @@ export class AichatComponent {
 
   constructor(
     private chatService: ChatService,
-    private explorerService: ExplorerService,
+    private explorerService: ExplorerCacheService,
     private errorService: ErrorService,
     private messageService: MessageService,
     private confirmationService: ConfirmationService,
-    private explorerSessionState: ExplorerSessionStateService,
     private reportService: ReportService,
     private factService: FactService,
     private projectService: ProjectService
@@ -884,10 +882,6 @@ export class AichatComponent {
     return `${total} result${total === 1 ? '' : 's'}`;
   }
 
-  getMessageQueryId(message: ChatMessage): string | null {
-    return this.getQueryIdForConversation(message);
-  }
-
   /**
    * True when the agent flagged the message as mappable. Mappable messages
    * carry a map statement, which mapIt runs directly; older messages without
@@ -897,39 +891,19 @@ export class AichatComponent {
     return message.mappable;
   }
 
-  /** Cache id of the pages a message maps to. */
-  private getQueryIdForConversation(message: ChatMessage): string | null {
-    if (message.mapStatement) {
-      return this.explorerSessionState.getOrCreatePageRequestId(message.mapStatement, null, 0, 100);
-    }
-
-    return null;
-  }
-
   /**
    * Fetches the pages to draw on the map for a message. Messages with a map
    * statement run it directly. Older messages without one fall back to having
    * the map-it agent generate SPARQL from the conversation history.
    */
-  private fetchMapPages(message: ChatMessage): Promise<LocationPage[]> | null {
+  private fetchMapPages(message: ChatMessage): Promise<CachedPageResult> | null {
     const statement = message.mapStatement;
 
     if (statement) {
-      return this.chatService.getPage(statement, null, 0, 100).then((page) => {
-        const pages = [page];
-
-        // Re-cache as a mapped chat query so it is labelled as one if saved
-        this.explorerSessionState.cachePages(
-          pages,
-          'chat-mapit',
-          this.explorerSessionState.getOrCreatePageRequestId(statement, null, 0, 100)
-        );
-
-        return pages;
-      });
+      return this.explorerService.getPage(statement, null, 0, 100);
     }
 
-    return Promise.resolve([]);
+    return null;
   }
 
   scrollToChatMessage(messageId: string): void {
@@ -956,37 +930,18 @@ export class AichatComponent {
     return `chat-message-${messageId}`;
   }
 
-  private findMappableMessageForQueryId(
-    queryId: string
-  ): { conversation: ChatConversation; message: ChatMessage } | null {
-    // for (const conversation of this.conversations) {
-    //   const mappableMessages = conversation.messages.filter((message) => this.isMappable(message));
-
-    //   for (const message of mappableMessages) {
-    //     const messageQueryId = this.getQueryIdForConversation(conversation, message);
-
-    //     if (messageQueryId === queryId) {
-    //       return { conversation, message };
-    //     }
-    //   }
-    // }
-
-    return null;
-  }
-
   mapIt(message: ChatMessage): void {
     const request = this.fetchMapPages(message);
-    const pageCacheId = this.getQueryIdForConversation(message);
 
-    if (!request || !pageCacheId) {
+    if (!request) {
       return;
     }
 
     this.mapLoading = true;
 
     request
-      .then((pages) => {
-        let total = pages.map((p) => p.count).reduce((a, b) => a + b, 0);
+      .then(({ pageCacheId, page }) => {
+        let total = page.count;
 
         if (total === 0) {
           this.messageService.add({
@@ -1003,7 +958,7 @@ export class AichatComponent {
 
         this.store.dispatch(
           ExplorerActions.showPagesOnMap({
-            pages,
+            pages: [page],
             zoomMap: true,
             step,
             data: { pageCacheId },
@@ -1021,10 +976,7 @@ export class AichatComponent {
 
     this.explorerService
       .fullTextLookup(message.location!)
-      .then((page) => {
-        const pageCacheId = this.explorerSessionState.getOrCreateFullTextLookupId(message.location!);
-        this.explorerSessionState.cachePages([page], pageCacheId, message.location);
-
+      .then(({ pageCacheId, page }) => {
         this.store.dispatch(
           ExplorerActions.setPages({
             pages: [page],
