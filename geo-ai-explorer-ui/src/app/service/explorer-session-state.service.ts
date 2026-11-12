@@ -4,11 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { ChatMessage, LocationPage } from '../models/chat.model';
 
-export type CachedExplorerPagesSource =
-  | 'chat-mapit'
-  | 'full-text-disambiguation'
-  | 'page-query'
-  | 'unknown';
+export type CachedExplorerPagesSource = 'chat-mapit' | 'full-text-disambiguation' | 'page-query' | 'unknown';
 
 export interface CachedExplorerPages {
   id: string;
@@ -23,7 +19,7 @@ export interface CachedExplorerPages {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ExplorerSessionStateService {
   private readonly prefix = 'explorer.pages.';
@@ -35,7 +31,23 @@ export class ExplorerSessionStateService {
 
   readonly savedQueries$ = this.savedQueriesSubject.asObservable();
 
-  cachePages(pages: LocationPage[], source: CachedExplorerPagesSource = 'unknown', id: string = uuidv4(), title?: string): string {
+  cachePages(
+    pages: LocationPage[],
+    source: CachedExplorerPagesSource = 'unknown',
+    id: string = uuidv4(),
+    title?: string
+  ): string {
+    console.log('cachePages: ' + id, pages);
+
+    if (pages.length > 1) {
+      try {
+        throw new Error('Failure');
+      } catch (err) {
+        const stackTrace = new Error().stack;
+        console.log('Custom captured stack:\n', stackTrace);
+      }
+    }
+
     if (!this.hasResults(pages)) {
       this.deleteCachedPages(id);
       return id;
@@ -51,11 +63,9 @@ export class ExplorerSessionStateService {
       accessedAt: Date.now(),
       savedAt: existing?.savedAt,
       pages,
-      source: source === 'unknown'
-        ? existing?.source ?? source
-        : source,
+      source: source === 'unknown' ? (existing?.source ?? source) : source,
       title: title ?? existing?.title ?? this.buildTitle(pages, source),
-      saved
+      saved,
     };
 
     try {
@@ -67,8 +77,7 @@ export class ExplorerSessionStateService {
         if (!this.setLocalItemWithSessionEviction(this.savedStorageKey(id), JSON.stringify(cache), id)) {
           throw new Error(`Unable to update saved explorer pages [${id}] after session cache eviction.`);
         }
-      }
-      else {
+      } else {
         if (!this.setSessionItemWithEviction(this.storageKey(id), JSON.stringify(cache), id)) {
           throw new Error(`Unable to cache explorer pages [${id}] after session cache eviction.`);
         }
@@ -84,19 +93,20 @@ export class ExplorerSessionStateService {
   }
 
   hasResults(pages: LocationPage[] | null | undefined): boolean {
-    return (pages ?? []).some(page =>
-      (page.count ?? 0) > 0 ||
-      (page.locations?.length ?? 0) > 0
-    );
+    return (pages ?? []).some((page) => (page.count ?? 0) > 0 || (page.locations?.length ?? 0) > 0);
   }
 
   getPages(id: string | null | undefined): LocationPage[] | null {
+    console.log('Getting page: ' + id);
+
     if (!id) {
       return null;
     }
 
     try {
       const cache = this.getCache(id);
+
+      console.log('Cache: ', cache);
 
       if (!cache) {
         return null;
@@ -107,21 +117,26 @@ export class ExplorerSessionStateService {
       if (cache.saved || this.hasSavedCache(id)) {
         sessionStorage.removeItem(this.storageKey(id));
         this.setLocalItemWithSessionEviction(this.savedStorageKey(id), JSON.stringify({ ...cache, saved: true }), id);
-      }
-      else {
+      } else {
         this.setSessionItemWithEviction(this.storageKey(id), JSON.stringify(cache), id);
       }
 
-      return Array.isArray(cache.pages)
-        ? cache.pages
-        : null;
+      return Array.isArray(cache.pages) ? cache.pages : null;
     } catch (error) {
       console.warn('Failed to read cached explorer pages from sessionStorage', error);
       return null;
     }
   }
 
-  getOrCreatePageRequestId(statement: string, type: string | null, offset: number, limit: number, excludedTypes: string[] = [], sortField?: string | null, sortDirection?: string | null): string {
+  getOrCreatePageRequestId(
+    statement: string,
+    type: string | null,
+    offset: number,
+    limit: number,
+    excludedTypes: string[] = [],
+    sortField?: string | null,
+    sortDirection?: string | null
+  ): string {
     return [
       'page-query',
       this.hash(statement),
@@ -130,19 +145,19 @@ export class ExplorerSessionStateService {
       this.hash(sortField ?? ''),
       this.hash(sortDirection ?? ''),
       offset,
-      limit
+      limit,
     ].join('.');
   }
 
   getOrCreateLocationsRequestId(messages: ChatMessage[], offset: number, limit: number): string {
     const key = JSON.stringify({
-      messages: messages.map(message => ({
+      messages: messages.map((message) => ({
         sender: message.sender,
         text: message.text,
-        purpose: message.purpose
+        purpose: message.purpose,
       })),
       offset,
-      limit
+      limit,
     });
 
     return ['locations-query', this.hash(key)].join('.');
@@ -155,27 +170,26 @@ export class ExplorerSessionStateService {
   listCachedPages(): CachedExplorerPages[] {
     const caches = new Map<string, CachedExplorerPages>();
 
-    this.collectCaches(sessionStorage, this.prefix).forEach(cache => {
+    this.collectCaches(sessionStorage, this.prefix).forEach((cache) => {
       caches.set(cache.id, cache);
     });
 
-    this.collectCaches(localStorage, this.savedPrefix).forEach(cache => {
+    this.collectCaches(localStorage, this.savedPrefix).forEach((cache) => {
       const existing = caches.get(cache.id);
 
       caches.set(cache.id, {
         ...cache,
         ...existing,
-        saved: true
+        saved: true,
       });
     });
 
-    return Array.from(caches.values())
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return Array.from(caches.values()).sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   listSavedPages(): CachedExplorerPages[] {
     return this.collectCaches(localStorage, this.savedPrefix)
-      .map(cache => ({ ...cache, saved: true }))
+      .map((cache) => ({ ...cache, saved: true }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
@@ -188,15 +202,14 @@ export class ExplorerSessionStateService {
 
     const touched = {
       ...cache,
-      accessedAt: Date.now()
+      accessedAt: Date.now(),
     };
 
     try {
       if (touched.saved || this.hasSavedCache(id)) {
         sessionStorage.removeItem(this.storageKey(id));
         this.setLocalItemWithSessionEviction(this.savedStorageKey(id), JSON.stringify({ ...touched, saved: true }), id);
-      }
-      else {
+      } else {
         this.setSessionItemWithEviction(this.storageKey(id), JSON.stringify(touched), id);
       }
     } catch (error) {
@@ -211,11 +224,9 @@ export class ExplorerSessionStateService {
       return null;
     }
 
-    const index = this.listSavedPages().findIndex(cache => cache.id === id);
+    const index = this.listSavedPages().findIndex((cache) => cache.id === id);
 
-    return index === -1
-      ? null
-      : index + 1;
+    return index === -1 ? null : index + 1;
   }
 
   saveCachedPages(id: string, title?: string): boolean {
@@ -231,9 +242,7 @@ export class ExplorerSessionStateService {
       saved: true,
       savedAt: cache.savedAt ?? Date.now(),
       updatedAt: Date.now(),
-      title: trimmedTitle && trimmedTitle.length > 0
-        ? trimmedTitle
-        : cache.title
+      title: trimmedTitle && trimmedTitle.length > 0 ? trimmedTitle : cache.title,
     };
 
     const serialized = JSON.stringify(savedCache);
@@ -249,8 +258,7 @@ export class ExplorerSessionStateService {
 
       this.refreshSavedQueries();
       return true;
-    }
-    catch (error) {
+    } catch (error) {
       console.warn('Failed to save explorer pages cache', error);
       return false;
     }
@@ -274,7 +282,7 @@ export class ExplorerSessionStateService {
       title: trimmedTitle,
       saved: true,
       savedAt: cache.savedAt ?? Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
 
     try {
@@ -303,7 +311,7 @@ export class ExplorerSessionStateService {
       ...cache,
       saved: false,
       savedAt: undefined,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
 
     try {
@@ -330,6 +338,8 @@ export class ExplorerSessionStateService {
   }
 
   private getCache(id: string | null | undefined): CachedExplorerPages | null {
+    console.log('Getting cache: ' + id);
+
     if (!id) {
       return null;
     }
@@ -339,7 +349,7 @@ export class ExplorerSessionStateService {
     if (sessionCache) {
       return {
         ...sessionCache,
-        saved: sessionCache.saved || this.hasSavedCache(id)
+        saved: sessionCache.saved || this.hasSavedCache(id),
       };
     }
 
@@ -348,7 +358,7 @@ export class ExplorerSessionStateService {
     if (savedCache) {
       const restored = {
         ...savedCache,
-        saved: true
+        saved: true,
       };
 
       return restored;
@@ -400,9 +410,9 @@ export class ExplorerSessionStateService {
         createdAt: cache.createdAt ?? Date.now(),
         updatedAt: cache.updatedAt ?? cache.createdAt ?? Date.now(),
         accessedAt: cache.accessedAt ?? cache.updatedAt ?? cache.createdAt ?? Date.now(),
-        savedAt: cache.savedAt ?? (cache.saved ? cache.updatedAt ?? cache.createdAt ?? Date.now() : undefined),
+        savedAt: cache.savedAt ?? (cache.saved ? (cache.updatedAt ?? cache.createdAt ?? Date.now()) : undefined),
         title: cache.title ?? this.buildTitle(cache.pages, cache.source ?? 'unknown'),
-        saved: cache.saved ?? false
+        saved: cache.saved ?? false,
       };
     } catch (error) {
       console.warn('Failed to parse cached explorer pages', error);
@@ -417,7 +427,7 @@ export class ExplorerSessionStateService {
   private pruneSessionCaches(): void {
     const sessionCaches = this.collectCaches(sessionStorage, this.prefix);
     const disposable = sessionCaches
-      .filter(cache => !cache.saved && !this.hasSavedCache(cache.id))
+      .filter((cache) => !cache.saved && !this.hasSavedCache(cache.id))
       .sort((a, b) => a.accessedAt - b.accessedAt);
 
     while (sessionCaches.length > this.maxSessionCaches && disposable.length > 0) {
@@ -428,17 +438,21 @@ export class ExplorerSessionStateService {
       }
 
       sessionStorage.removeItem(this.storageKey(oldest.id));
-      sessionCaches.splice(sessionCaches.findIndex(cache => cache.id === oldest.id), 1);
+      sessionCaches.splice(
+        sessionCaches.findIndex((cache) => cache.id === oldest.id),
+        1
+      );
     }
   }
 
   private setSessionItemWithEviction(key: string, value: string, protectedId?: string): boolean {
     for (let attempt = 0; attempt < this.maxQuotaWriteAttempts; attempt++) {
       try {
+        console.log('Setting session storage - ' + key, value);
+
         sessionStorage.setItem(key, value);
         return true;
-      }
-      catch (error) {
+      } catch (error) {
         if (!this.isQuotaExceededError(error) || !this.evictSessionCacheEntry(protectedId)) {
           console.warn('Failed to write explorer pages cache to sessionStorage', error);
           return false;
@@ -454,8 +468,7 @@ export class ExplorerSessionStateService {
       try {
         localStorage.setItem(key, value);
         return true;
-      }
-      catch (error) {
+      } catch (error) {
         if (!this.isQuotaExceededError(error) || !this.evictSessionCacheEntry(protectedId)) {
           console.warn('Failed to write saved explorer pages cache to localStorage', error);
           return false;
@@ -468,11 +481,11 @@ export class ExplorerSessionStateService {
 
   private evictSessionCacheEntry(protectedId?: string): boolean {
     const sessionCaches = this.collectCaches(sessionStorage, this.prefix)
-      .filter(cache => cache.id !== protectedId)
+      .filter((cache) => cache.id !== protectedId)
       .sort((a, b) => a.accessedAt - b.accessedAt);
 
-    const unsaved = sessionCaches.find(cache => !cache.saved && !this.hasSavedCache(cache.id));
-    const evictable = unsaved ?? sessionCaches.find(cache => cache.saved || this.hasSavedCache(cache.id));
+    const unsaved = sessionCaches.find((cache) => !cache.saved && !this.hasSavedCache(cache.id));
+    const evictable = unsaved ?? sessionCaches.find((cache) => cache.saved || this.hasSavedCache(cache.id));
 
     if (!evictable) {
       return false;
@@ -483,8 +496,10 @@ export class ExplorerSessionStateService {
   }
 
   private isQuotaExceededError(error: unknown): boolean {
-    return error instanceof DOMException &&
-      (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+    return (
+      error instanceof DOMException &&
+      (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    );
   }
 
   private storageKey(id: string): string {
@@ -497,17 +512,11 @@ export class ExplorerSessionStateService {
 
   private buildTitle(pages: LocationPage[], source: CachedExplorerPagesSource): string {
     const total = pages.reduce((sum, page) => sum + (page.count ?? page.locations?.length ?? 0), 0);
-    const typeLabels = pages
-      .map(page => this.typeLabel(page.type))
-      .filter(label => label.length > 0);
+    const typeLabels = pages.map((page) => this.typeLabel(page.type)).filter((label) => label.length > 0);
     const uniqueTypeLabels = Array.from(new Set(typeLabels));
-    const label = uniqueTypeLabels.length > 0
-      ? uniqueTypeLabels.slice(0, 2).join(', ')
-      : this.sourceLabel(source);
+    const label = uniqueTypeLabels.length > 0 ? uniqueTypeLabels.slice(0, 2).join(', ') : this.sourceLabel(source);
 
-    return total > 0
-      ? `${label} (${total})`
-      : label;
+    return total > 0 ? `${label} (${total})` : label;
   }
 
   private typeLabel(type: string | null | undefined): string {
@@ -519,9 +528,7 @@ export class ExplorerSessionStateService {
     const slashIndex = type.lastIndexOf('/');
     const index = Math.max(hashIndex, slashIndex);
 
-    return index === -1
-      ? type
-      : type.substring(index + 1);
+    return index === -1 ? type : type.substring(index + 1);
   }
 
   private sourceLabel(source: CachedExplorerPagesSource): string {
@@ -536,7 +543,7 @@ export class ExplorerSessionStateService {
     let hash = 0;
 
     for (let i = 0; i < value.length; i++) {
-      hash = ((hash << 5) - hash) + value.charCodeAt(i);
+      hash = (hash << 5) - hash + value.charCodeAt(i);
       hash |= 0;
     }
 

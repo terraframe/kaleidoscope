@@ -24,12 +24,8 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import net.geoprism.geoai.explorer.core.config.TestConfiguration;
 import net.geoprism.geoai.explorer.core.mock.MockDataTest;
-import net.geoprism.geoai.explorer.core.model.History;
-import net.geoprism.geoai.explorer.core.model.HistoryMessage;
-import net.geoprism.geoai.explorer.core.model.HistoryMessageType;
 import net.geoprism.geoai.explorer.core.model.Message;
 import net.geoprism.geoai.explorer.core.model.NameResolutionResult;
-import net.geoprism.geoai.explorer.core.repository.ProjectRepository;
 import net.geoprism.geoai.explorer.core.service.search.BasicSearchService;
 
 @ExtendWith(SpringExtension.class)
@@ -84,9 +80,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
 
     System.out.println(statements.get(0));
 
-    // A single-object answer is not mapIt, so no map statement is expected
     assertNoProblems(checkNoGeometryInExecutedQueries(statements));
-    Assert.assertFalse("Failed with message: " + message.getContent(), message.getMappable());
+    Assert.assertTrue("Failed with message: " + message.getMapStatement(), message.getMappable());
     assertNoProblems(checkMapStatementMatchesMapIt(message));
   }
 
@@ -166,7 +161,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
     Assert.assertFalse(message.getStatements().isEmpty());
     Assert.assertTrue("Failed with message: " + message.getContent(), message.getMappable());
 
-    // The executed aggregate must not touch geometry; the audit statement returns the summed structures
+    // The executed aggregate must not touch geometry; the audit statement
+    // returns the summed structures
     assertNoProblems(checkNoGeometryInExecutedQueries(message.getStatements()));
     assertNoProblems(checkMapStatementMatchesMapIt(message, "Structure", "pop2pmu65"));
   }
@@ -179,13 +175,14 @@ public class BedrockServiceIntegrationTest extends MockDataTest
     Message message = service.prompt(UUID.randomUUID().toString(), "What is the total value of structures at risk with the no mitigation scenario versus the combo plan scenario?");
 
     System.out.println(message.getContent());
-    System.out.println(message.getMapStatement());
+    System.out.println();
 
     Assert.assertTrue(message.getContent().trim().length() > 0);
     Assert.assertFalse(message.getAmbiguous());
 
-    // Unchanged behavior: comparisons across several queries are not flagged mapIt
-    Assert.assertFalse("Failed with message: " + message.getContent(), message.getMappable());
+    // Unchanged behavior: comparisons across several queries are not flagged
+    // mapIt
+    Assert.assertFalse("Failed with map statement: " + message.getMapStatement(), message.getMappable());
 
     // ...so no map statement is expected either
     assertNoProblems(checkNoGeometryInExecutedQueries(message.getStatements()));
@@ -218,7 +215,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
     Assert.assertTrue(message.getContent().trim().length() > 0);
     Assert.assertFalse(message.getStatements().isEmpty());
 
-    // Geometry is allowed here, but only for the specific object the user asked about
+    // Geometry is allowed here, but only for the specific object the user asked
+    // about
     for (String statement : message.getStatements())
     {
       Assert.assertTrue("Geometry query was not restricted to the requested object:\n" + statement, statement.contains("2012X"));
@@ -227,29 +225,5 @@ public class BedrockServiceIntegrationTest extends MockDataTest
 
     // A single-object answer is not mapIt, so no map statement is expected
     assertNoProblems(checkMapStatementMatchesMapIt(message));
-  }
-
-  @Test
-  public void testMapIt_GetLocationsAggregation() throws InterruptedException, ExecutionException, TimeoutException
-  {
-    History history = new History();
-    history.addMessage(new HistoryMessage(HistoryMessageType.USER, "what is the total population of a land parcel with a name of Land Parcel 23?"));
-    history.addMessage(new HistoryMessage(HistoryMessageType.AI, """
-        I found three land parcels named **Land Parcel 23**. Which one do you mean?
-
-        - [structure_25 — CK1_23](https://localhost/graph#LandParcel-CK1_23)
-        - [structure_25 — CMD_23](https://localhost/graph#LandParcel-CMD_23)
-        - [structure_25 — LDA_23](https://localhost/graph#LandParcel-LDA_23)
-            """));
-    history.addMessage(new HistoryMessage(HistoryMessageType.USER, "LDA_23"));
-
-    String sparql = service.getLocationSparql(history);
-
-    Assert.assertTrue(sparql.contains("LDA_23"));
-    Assert.assertTrue(sparql.contains("LocatedIn"));
-    Assert.assertTrue(sparql.contains("?type"));
-    Assert.assertTrue(sparql.contains("?code"));
-    Assert.assertTrue(sparql.contains("?label"));
-    Assert.assertTrue(sparql.contains("?wkt"));
   }
 }

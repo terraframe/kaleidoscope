@@ -1,14 +1,15 @@
-<div class="explorer-root"
-     [ngClass]="{
-       'layout-full-chat': workflowStep === WorkflowStep.FullScreenChat,
-       'layout-ai-results': workflowStep === WorkflowStep.AiChatAndResults,
-       'layout-map-results': workflowStep === WorkflowStep.MapAndResults,
-       'layout-disambiguate': workflowStep === WorkflowStep.DisambiguateObject,
-       'layout-min-chat': workflowStep === WorkflowStep.MinimizeChat,
-       'layout-inspect': workflowStep === WorkflowStep.InspectObject || workflowStep === WorkflowStep.ViewNeighbors
-     }"
-  [style.--results-panel-height.px]="resultsPanelHeightPx">
-
+<div
+  class="explorer-root"
+  [ngClass]="{
+    'layout-full-chat': workflowStep === WorkflowStep.FullScreenChat,
+    'layout-ai-results': workflowStep === WorkflowStep.AiChatAndResults,
+    'layout-map-results': workflowStep === WorkflowStep.MapAndResults,
+    'layout-disambiguate': workflowStep === WorkflowStep.DisambiguateObject,
+    'layout-min-chat': workflowStep === WorkflowStep.MinimizeChat,
+    'layout-inspect': workflowStep === WorkflowStep.InspectObject || workflowStep === WorkflowStep.ViewNeighbors,
+  }"
+  [style.--results-panel-height.px]="resultsPanelHeightPx"
+>
   <p-toast position="top-center" key="explorer" />
 
   <p-toast position="top-center" key="session">
@@ -16,93 +17,10 @@
       <div class="session-toast">
         <div class="session-toast-summary">{{ message.summary }}</div>
         <div>{{ message.detail }}</div>
-        <p-button
-          label="Log in"
-          size="small"
-          (onClick)="reloadPage()">
-        </p-button>
+        <p-button label="Log in" size="small" (onClick)="reloadPage()"> </p-button>
       </div>
     </ng-template>
   </p-toast>
-
-  <p-dialog
-    header="Save Query"
-    [(visible)]="saveQueryDialogVisible"
-    [modal]="true"
-    [draggable]="false"
-    [resizable]="false"
-    appendTo="body"
-    styleClass="save-query-dialog">
-    <div class="save-query-form">
-      <label for="save-query-name">Name</label>
-      <input
-        id="save-query-name"
-        type="text"
-        [(ngModel)]="saveQueryName"
-        (keydown.enter)="saveCurrentQuery()"
-        autocomplete="off" />
-    </div>
-
-    <ng-template pTemplate="footer">
-      <p-button
-        severity="secondary"
-        label="Cancel"
-        (onClick)="saveQueryDialogVisible = false">
-      </p-button>
-
-      <p-button
-        label="Save"
-        [disabled]="!saveQueryName.trim()"
-        (onClick)="saveCurrentQuery()">
-      </p-button>
-    </ng-template>
-  </p-dialog>
-
-  <p-dialog
-    header="Saved Query"
-    [(visible)]="savedQueryDialogVisible"
-    [modal]="true"
-    [draggable]="false"
-    [resizable]="false"
-    appendTo="body"
-    styleClass="save-query-dialog">
-    <div class="save-query-form saved-query-details">
-      @if (savedQueryDetails) {
-        <div class="saved-query-meta">
-          <span>Saved</span>
-          <strong>{{ formatSavedQueryDate(savedQueryDetails) }}</strong>
-        </div>
-      }
-
-      <label for="saved-query-name">Name</label>
-      <input
-        id="saved-query-name"
-        type="text"
-        [(ngModel)]="savedQueryName"
-        (keydown.enter)="renameCurrentSavedQuery()"
-        autocomplete="off" />
-    </div>
-
-    <ng-template pTemplate="footer">
-      <p-button
-        severity="danger"
-        label="Unsave"
-        (onClick)="unsaveCurrentQuery()">
-      </p-button>
-
-      <p-button
-        severity="secondary"
-        label="Close"
-        (onClick)="savedQueryDialogVisible = false">
-      </p-button>
-
-      <p-button
-        label="Rename"
-        [disabled]="!savedQueryName.trim() || savedQueryName.trim() === savedQueryDetails?.title"
-        (onClick)="renameCurrentSavedQuery()">
-      </p-button>
-    </ng-template>
-  </p-dialog>
 
   @if (loading) {
     <div class="spinner-overlay">
@@ -115,9 +33,8 @@
     workflowStep === WorkflowStep.FullScreenChat ||
     workflowStep === WorkflowStep.AiChatAndResults ||
     workflowStep === WorkflowStep.MinimizeChat
-    ) {
-    <section class="chat-panel"
-      >
+  ) {
+    <section class="chat-panel">
       <aichat [class.small-ai-chat]="workflowStep === WorkflowStep.MinimizeChat"></aichat>
     </section>
   }
@@ -125,14 +42,8 @@
   @if (selectedObject && workflowStep !== WorkflowStep.FullScreenChat) {
     <section class="inspector">
       @if (workflowStep !== WorkflowStep.DisambiguateObject) {
-        <div
-          class="inspector-top-actions">
-          <p-button
-            class="inspector-back-button"
-            severity="secondary"
-            pTooltip="Go Back"
-            (onClick)="onMapBack()"
-            >
+        <div class="inspector-top-actions">
+          <p-button class="inspector-back-button" severity="secondary" pTooltip="Go Back" (onClick)="onMapBack()">
             <fa-icon [icon]="backIcon"></fa-icon>
             <label>
               {{ getBackButtonLabel(previousWorkflowStep$ | async) }}
@@ -145,7 +56,8 @@
               [class.active]="graphPanelOpen"
               [pTooltip]="graphPanelOpen ? 'Close Graph Visualizer' : 'Open Graph Visualizer'"
               tooltipPosition="bottom"
-              (click)="toggleGraphPanel()">
+              (click)="toggleGraphPanel()"
+            >
               <fa-icon [icon]="relationshipIcon"></fa-icon>
             </button>
           }
@@ -154,14 +66,17 @@
       <div
         class="horizontal-layout inspector-controls"
         [class.has-floating-back]="workflowStep !== WorkflowStep.DisambiguateObject"
-        [style.--inspector-left-width.%]="inspectorSplitPercent">
+        [style.--inspector-left-width.%]="inspectorSplitPercent"
+      >
         @if ((previousWorkflowStep$ | async) === WorkflowStep.DisambiguateObject) {
           <h2>Select An Object</h2>
-          <p-button class="disambiguate-inspector-select-button"
+          <p-button
+            class="disambiguate-inspector-select-button"
             severity="secondary"
             pTooltip="Use the selected object to resolve the ambiguity"
             (onClick)="disambiguate()"
-            [disabled]="selectedObject == null">
+            [disabled]="selectedObject == null"
+          >
             <label>Select</label>
             <fa-icon [icon]="forwardIcon"></fa-icon>
           </p-button>
@@ -190,9 +105,9 @@
           [class.attributes-hidden]="!attributesPanelOpen"
           [class.graph-open]="graphPanelOpen"
           [style.--inspector-left-width.%]="inspectorSplitPercent"
-          [style.--inspector-graph-width.%]="graphPanelWidthPercent">
-          <section
-            class="object-pane object-pane-map">
+          [style.--inspector-graph-width.%]="graphPanelWidthPercent"
+        >
+          <section class="object-pane object-pane-map">
             <div #mapElement id="map"></div>
             <ng-container *ngTemplateOutlet="legendPanelTemplate"></ng-container>
           </section>
@@ -205,8 +120,8 @@
               (pointerdown)="startInspectorResize($event)"
               (pointermove)="onInspectorResize($event)"
               (pointerup)="endInspectorResize($event)"
-              (pointercancel)="endInspectorResize($event)">
-            </div>
+              (pointercancel)="endInspectorResize($event)"
+            ></div>
           }
           <div class="inspector-pull-tabs">
             <button
@@ -215,7 +130,8 @@
               [class.active]="attributesPanelOpen"
               [pTooltip]="attributesPanelOpen ? 'Close Attributes' : 'Open Attributes'"
               tooltipPosition="right"
-              (click)="toggleAttributesPanel()">
+              (click)="toggleAttributesPanel()"
+            >
               <fa-icon [icon]="attributesPanelOpen ? hideAttributesIcon : showAttributesIcon"></fa-icon>
             </button>
           </div>
@@ -228,21 +144,19 @@
                   [class.active]="graphPanelOpen"
                   [pTooltip]="graphPanelOpen ? 'Close Graph Visualizer' : 'Open Graph Visualizer'"
                   tooltipPosition="right"
-                  (click)="toggleGraphPanel()">
+                  (click)="toggleGraphPanel()"
+                >
                   <fa-icon [icon]="relationshipIcon"></fa-icon>
                 </button>
               }
             </div>
           }
           @if (attributesPanelOpen) {
-            <section
-              class="object-pane object-pane-attributes"
-              >
+            <section class="object-pane object-pane-attributes">
               <div class="object-pane-shell">
                 <div class="object-pane-body">
                   @if ((previousWorkflowStep$ | async) !== WorkflowStep.DisambiguateObject) {
-                    <h2 class="inspector-title"
-                      >
+                    <h2 class="inspector-title">
                       {{ selectedObject.properties.label }}
                     </h2>
                   }
@@ -254,15 +168,10 @@
             </section>
           }
           @if (graphPanelOpen) {
-            <section
-              class="object-pane object-pane-graph"
-              >
+            <section class="object-pane object-pane-graph">
               <div class="object-pane-shell">
                 <div class="object-pane-body">
-                  <graph-explorer
-                    #graphExplorer
-                    [explorer]="this">
-                  </graph-explorer>
+                  <graph-explorer #graphExplorer [explorer]="this"> </graph-explorer>
                 </div>
               </div>
             </section>
@@ -276,8 +185,8 @@
               (pointerdown)="startGraphResize($event)"
               (pointermove)="onGraphResize($event)"
               (pointerup)="endGraphResize($event)"
-              (pointercancel)="endGraphResize($event)">
-            </div>
+              (pointercancel)="endGraphResize($event)"
+            ></div>
           }
         </div>
       }
@@ -301,10 +210,7 @@
               </p-tabpanel>
               <p-tabpanel value="1">
                 @if (activeTab === '1') {
-                  <graph-explorer
-                    #graphExplorer
-                    [explorer]="this">
-                  </graph-explorer>
+                  <graph-explorer #graphExplorer [explorer]="this"> </graph-explorer>
                 }
               </p-tabpanel>
             </p-tabpanels>
@@ -319,22 +225,16 @@
     workflowStep === WorkflowStep.MapAndResults ||
     workflowStep === WorkflowStep.DisambiguateObject ||
     workflowStep === WorkflowStep.MinimizeChat
-    ) {
-    <section class="map-panel"
-      >
+  ) {
+    <section class="map-panel">
       <div #mapElement id="map"></div>
       @if (selectedObject == null && workflowStep !== WorkflowStep.DisambiguateObject) {
-        <p-button
-          class="map-back-button"
-          severity="secondary"
-          pTooltip="Go Back"
-          (onClick)="onMapBack()"
-          >
+        <p-button class="map-back-button" severity="secondary" pTooltip="Go Back" (onClick)="onMapBack()">
           <fa-icon [icon]="backIcon"></fa-icon>
           <label>Back to chat</label>
         </p-button>
       }
-      @if (selectedObject == null && workflowStep !== WorkflowStep.DisambiguateObject && canSaveCurrentQueryValue && !currentSavedQueryIndexValue) {
+      <!-- @if (selectedObject == null && workflowStep !== WorkflowStep.DisambiguateObject && canSaveCurrentQueryValue && !currentSavedQueryIndexValue) {
         <p-button
           class="map-save-query-button"
           severity="secondary"
@@ -355,7 +255,7 @@
           <fa-icon [icon]="saveQueryIcon"></fa-icon>
           <label>{{ currentSavedQueryValue?.title ?? 'Saved Query' }}</label>
         </p-button>
-      }
+      } -->
       <ng-container *ngTemplateOutlet="legendPanelTemplate"></ng-container>
     </section>
   }
@@ -366,27 +266,22 @@
     workflowStep === WorkflowStep.MapAndResults ||
     workflowStep === WorkflowStep.DisambiguateObject ||
     workflowStep === WorkflowStep.MinimizeChat
-    ) {
-    <section class="results-panel"
-      >
+  ) {
+    <section class="results-panel">
       <!-- Disambiguation Header -->
       @if (workflowStep === WorkflowStep.DisambiguateObject) {
-        <div id="disambiguate-header"
-          class="horizontal-layout"
-          >
-          <p-button
-            class="disambiguate-back-button"
-            severity="secondary"
-            pTooltip="Go Back"
-            (onClick)="onMapBack()">
+        <div id="disambiguate-header" class="horizontal-layout">
+          <p-button class="disambiguate-back-button" severity="secondary" pTooltip="Go Back" (onClick)="onMapBack()">
             <fa-icon [icon]="backIcon"></fa-icon>
             <label>Back to chat</label>
           </p-button>
           <h2>Select An Object</h2>
-          <p-button severity="secondary"
+          <p-button
+            severity="secondary"
             pTooltip="Use the selected object to resolve the ambiguity"
             (onClick)="disambiguate()"
-            [disabled]="selectedObject == null">
+            [disabled]="selectedObject == null"
+          >
             <label>Select</label>
             <fa-icon [icon]="forwardIcon"></fa-icon>
           </p-button>
@@ -411,40 +306,33 @@
       workflowStep === WorkflowStep.MinimizeChat ||
       workflowStep === WorkflowStep.InspectObject ||
       workflowStep === WorkflowStep.ViewNeighbors
-      ) {
-      <p-panel
-        [toggleable]="true"
-        [(collapsed)]="legendCollapsed"
-        (click)="onLegendPanelClick($event)"
-        class="legend">
+    ) {
+      <p-panel [toggleable]="true" [(collapsed)]="legendCollapsed" (click)="onLegendPanelClick($event)" class="legend">
         <ng-template pTemplate="header">
           <h4>Layers</h4>
         </ng-template>
         @if (orderedTypes.length > 0) {
           <div cdkDropList (cdkDropListDropped)="drop($event)">
             @for (type of orderedTypes; track type) {
-              <div class="legend-item horizontal-layout"
-                cdkDrag>
+              <div class="legend-item horizontal-layout" cdkDrag>
                 @if (typeLegend[type]; as legend) {
-                  <span
-                    class="legend-drag-handle"
-                    cdkDragHandle
-                    aria-hidden="true"
-                    (click)="$event.stopPropagation()">
+                  <span class="legend-drag-handle" cdkDragHandle aria-hidden="true" (click)="$event.stopPropagation()">
                   </span>
-                  <p-checkbox binary="true"
+                  <p-checkbox
+                    binary="true"
                     [ngModel]="legend.visible"
                     [inputId]="legend.label"
-                    (onChange)="toggleTypeLegend(type, legend)" />
-                  <div class="square"
-                    [ngStyle]="{ background: legend.color }">
-                  </div>
-                  <button type="button"
+                    (onChange)="toggleTypeLegend(type, legend)"
+                  />
+                  <div class="square" [ngStyle]="{ background: legend.color }"></div>
+                  <button
+                    type="button"
                     class="legend-layer-name"
                     (pointerdown)="$event.stopPropagation()"
                     (mousedown)="$event.stopPropagation()"
                     (touchstart)="$event.stopPropagation()"
-                    (click)="openResultsForType(type, $event)">
+                    (click)="openResultsForType(type, $event)"
+                  >
                     {{ legend.label }}
                   </button>
                 }
@@ -452,21 +340,20 @@
             }
           </div>
         }
-        <hr class="legend-divider">
+        <hr class="legend-divider" />
         @if (vectorLayers$ | async; as vectorLayers) {
           @if (vectorLayers.length > 0) {
             <h4>Context Layers</h4>
             <div>
               @for (layer of vectorLayers; track layer) {
-                <div class="legend-item horizontal-layout"
-                  >
-                  <p-checkbox binary="true"
+                <div class="legend-item horizontal-layout">
+                  <p-checkbox
+                    binary="true"
                     [ngModel]="layer.enabled"
                     [inputId]="layer.id"
-                    (onChange)="toggleVectorLayer(layer)" />
-                  <div class="square"
-                    [ngStyle]="{ background: layer.color }">
-                  </div>
+                    (onChange)="toggleVectorLayer(layer)"
+                  />
+                  <div class="square" [ngStyle]="{ background: layer.color }"></div>
                   <label [for]="layer.id" class="ml-2">
                     {{ layer.label }}
                   </label>

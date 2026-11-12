@@ -462,7 +462,7 @@ export class AichatComponent {
     return {
       ...message,
       renderedHtml: message.sender === 'system' ? this.renderMarkdown(parsedText) : parsedText,
-      savedQueryIndex: this.isMappable(message) ? this.getSavedQueryIndexForConversation(conversation, message) : null,
+      savedQueryIndex: null,
     };
   }
 
@@ -884,86 +884,6 @@ export class AichatComponent {
     this.newConversation();
   }
 
-  viewCachedQuery(query: CachedExplorerPages): void {
-    this.store.dispatch(
-      ExplorerActions.showPagesOnMap({
-        pages: query.pages,
-        zoomMap: true,
-        step: WorkflowStep.MapAndResults,
-        data: { pageCacheId: query.id },
-      })
-    );
-  }
-
-  openSavedQueryChat(query: CachedExplorerPages): void {
-    if (this.editingSavedQueryId === query.id) {
-      return;
-    }
-
-    const target = this.findMappableMessageForQueryId(query.id);
-
-    if (!target) {
-      this.viewCachedQuery(query);
-      return;
-    }
-
-    this.activeConversationId = target.conversation.id;
-    this.refreshRenderedMessages();
-    this.saveConversations();
-    this.scrollToChatMessage(target.message.id);
-  }
-
-  startEditingSavedQueryTitle(event: Event, query: CachedExplorerPages): void {
-    event.stopPropagation();
-
-    if (this.editingSavedQueryId === query.id) {
-      this.cancelSavedQueryTitleEdit();
-      return;
-    }
-
-    this.editingSavedQueryId = query.id;
-    this.editingSavedQueryTitle = query.title;
-  }
-
-  saveSavedQueryTitle(event: Event, query: CachedExplorerPages): void {
-    event.stopPropagation();
-
-    const title = this.editingSavedQueryTitle.trim();
-
-    if (!title) {
-      return;
-    }
-
-    this.explorerSessionState.renameSavedPages(query.id, title);
-    this.editingSavedQueryId = null;
-    this.editingSavedQueryTitle = '';
-  }
-
-  cancelSavedQueryTitleEdit(event?: Event): void {
-    event?.stopPropagation();
-
-    this.editingSavedQueryId = null;
-    this.editingSavedQueryTitle = '';
-  }
-
-  deleteCachedQuery(event: Event, query: CachedExplorerPages): void {
-    event.stopPropagation();
-
-    this.confirmationService.confirm({
-      target: event.currentTarget as EventTarget,
-      header: 'Delete query?',
-      message: `Delete "${query.title}" from saved queries?`,
-      icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'Delete',
-      rejectLabel: 'Cancel',
-      acceptButtonStyleClass: 'p-button-danger',
-      rejectButtonStyleClass: 'p-button-secondary p-button-text',
-      accept: () => {
-        this.explorerSessionState.deleteCachedPages(query.id);
-      },
-    });
-  }
-
   formatQueryDate(query: CachedExplorerPages): string {
     return new Date(query.updatedAt).toLocaleString();
   }
@@ -975,9 +895,7 @@ export class AichatComponent {
   }
 
   getMessageQueryId(message: ChatMessage): string | null {
-    const conversation = this.activeConversation;
-
-    return conversation ? this.getQueryIdForConversation(conversation, message) : null;
+    return this.getQueryIdForConversation(message);
   }
 
   /**
@@ -990,14 +908,12 @@ export class AichatComponent {
   }
 
   /** Cache id of the pages a message maps to. */
-  private getQueryIdForConversation(conversation: ChatConversation, message: ChatMessage): string | null {
+  private getQueryIdForConversation(message: ChatMessage): string | null {
     if (message.mapStatement) {
       return this.explorerSessionState.getOrCreatePageRequestId(message.mapStatement, null, 0, 100);
     }
 
-    const history = this.getMappableHistoryForConversation(conversation, message);
-
-    return history ? this.explorerSessionState.getOrCreateLocationsRequestId(history, 0, 100) : null;
+    return null;
   }
 
   /**
@@ -1005,7 +921,7 @@ export class AichatComponent {
    * statement run it directly. Older messages without one fall back to having
    * the map-it agent generate SPARQL from the conversation history.
    */
-  private fetchMapPages(conversation: ChatConversation, message: ChatMessage): Promise<LocationPage[]> | null {
+  private fetchMapPages(message: ChatMessage): Promise<LocationPage[]> | null {
     const statement = message.mapStatement;
 
     if (statement) {
@@ -1023,89 +939,7 @@ export class AichatComponent {
       });
     }
 
-    const history = this.getMappableHistoryForConversation(conversation, message);
-
-    return history ? this.chatService.getLocations(history, 0, 100) : null;
-  }
-
-  private getSavedQueryIndexForConversation(conversation: ChatConversation, message: ChatMessage): number | null {
-    const queryId = this.getQueryIdForConversation(conversation, message);
-
-    return queryId ? this.savedQueryIndexById.get(queryId) ?? null : null;
-  }
-
-  saveOrScrollQuery(event: Event, message: ChatMessage): void {
-    event.stopPropagation();
-
-    const queryId = this.getMessageQueryId(message);
-
-    if (!queryId) {
-      return;
-    }
-
-    const savedIndex = this.explorerSessionState.getSavedQueryIndex(queryId);
-
-    if (savedIndex != null) {
-      this.scrollToSavedQuery(queryId);
-      return;
-    }
-
-    const cached = this.explorerSessionState.getCachedPages(queryId);
-
-    if (cached) {
-      this.explorerSessionState.saveCachedPages(queryId);
-      this.scrollToSavedQuery(queryId);
-      return;
-    }
-
-    const conversation = this.activeConversation;
-    const request = conversation ? this.fetchMapPages(conversation, message) : null;
-
-    if (!request) {
-      return;
-    }
-
-    this.mapLoading = true;
-
-    request
-      .then((pages) => {
-        if (!this.explorerSessionState.hasResults(pages)) {
-          this.messageService.add({
-            key: 'explorer',
-            severity: 'info',
-            summary: 'Info',
-            detail: 'The query did not return any results!',
-            sticky: true,
-          });
-          return;
-        }
-
-        this.explorerSessionState.saveCachedPages(queryId);
-        this.scrollToSavedQuery(queryId);
-      })
-      .catch((error) => this.errorService.handleError(error))
-      .finally(() => {
-        this.mapLoading = false;
-      });
-  }
-
-  scrollToSavedQuery(queryId: string): void {
-    this.activeSidebarTab = 'queries';
-    this.saveActiveSidebarTab();
-
-    requestAnimationFrame(() => {
-      const el = document.getElementById(this.savedQueryElementId(queryId));
-      el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-
-      if (el) {
-        this.highlightSavedQueryId = queryId;
-        window.setTimeout(() => {
-          if (this.highlightSavedQueryId === queryId) {
-            this.highlightSavedQueryId = null;
-          }
-        }, 1400);
-      }
-    });
+    return Promise.resolve([]);
   }
 
   scrollToChatMessage(messageId: string): void {
@@ -1135,43 +969,24 @@ export class AichatComponent {
   private findMappableMessageForQueryId(
     queryId: string
   ): { conversation: ChatConversation; message: ChatMessage } | null {
-    for (const conversation of this.conversations) {
-      const mappableMessages = conversation.messages.filter((message) => this.isMappable(message));
+    // for (const conversation of this.conversations) {
+    //   const mappableMessages = conversation.messages.filter((message) => this.isMappable(message));
 
-      for (const message of mappableMessages) {
-        const messageQueryId = this.getQueryIdForConversation(conversation, message);
+    //   for (const message of mappableMessages) {
+    //     const messageQueryId = this.getQueryIdForConversation(conversation, message);
 
-        if (messageQueryId === queryId) {
-          return { conversation, message };
-        }
-      }
-    }
+    //     if (messageQueryId === queryId) {
+    //       return { conversation, message };
+    //     }
+    //   }
+    // }
 
     return null;
   }
 
-  private getMappableHistoryForConversation(
-    conversation: ChatConversation,
-    message: ChatMessage
-  ): ChatMessage[] | null {
-    const index = conversation.messages.findIndex((m) => m.id === message.id);
-
-    if (index === -1) {
-      return null;
-    }
-
-    return conversation.messages.slice(0, index + 1).filter((m) => m.purpose === 'standard');
-  }
-
   mapIt(message: ChatMessage): void {
-    const conversation = this.activeConversation;
-
-    if (!conversation) {
-      return;
-    }
-
-    const request = this.fetchMapPages(conversation, message);
-    const pageCacheId = this.getQueryIdForConversation(conversation, message);
+    const request = this.fetchMapPages(message);
+    const pageCacheId = this.getQueryIdForConversation(message);
 
     if (!request || !pageCacheId) {
       return;
@@ -1804,6 +1619,24 @@ export class AichatComponent {
 
     this.fact = { ...fact, statements: [...(fact.statements ?? [])] };
     this.visible = true;
+  }
+
+  viewFact(event: Event, fact: Fact): void {
+    event.stopPropagation();
+
+    const message: ChatMessage = {
+      id: fact.id!.toString(),
+      sender: 'system',
+      text: fact.text,
+      mappable: true,
+      ambiguous: false,
+      parsedText: fact.text,
+      purpose: 'standard',
+      statements: fact.statements,
+      mapStatement: fact.mapStatement,
+    };
+
+    this.mapIt(message);
   }
 
   saveFact(): void {

@@ -18,12 +18,10 @@ import org.springframework.stereotype.Service;
 
 import net.geoprism.geoai.explorer.core.config.AppProperties;
 import net.geoprism.geoai.explorer.core.model.GenericRestException;
-import net.geoprism.geoai.explorer.core.model.History;
 import net.geoprism.geoai.explorer.core.model.Message;
 import net.geoprism.geoai.explorer.core.model.PromptResponse;
 import net.geoprism.geoai.explorer.core.model.ToolResponse;
 import net.geoprism.geoai.explorer.core.service.prompt.ChatPromptService;
-import net.geoprism.geoai.explorer.core.service.prompt.MapItPromptService;
 import net.geoprism.geoai.explorer.core.service.prompt.ReportPromptService;
 import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
@@ -105,9 +103,6 @@ public class BedrockService
   private ChatPromptService   chatPromptService;
 
   @Autowired
-  private MapItPromptService  mapItPromptService;
-
-  @Autowired
   private ReportPromptService reportPromptService;
 
   @Autowired
@@ -130,20 +125,16 @@ public class BedrockService
                     .putString("type", "boolean") //
                     .putString("description", "true only when the name resolution tool returned more than one possible match and you are asking the user to choose between them. Otherwise false.") //
                     .build()) //
-                .putDocument("mapIt", Document.mapBuilder() //
-                    .putString("type", "boolean") //
-                    .putString("description", "true only when the text describes the result set returned by a single invocation of the SPARQL query tool and that result set contains locations that can be drawn on a map (for example, \"200 land parcels are at risk under the No Mitigation scenario\"). Set it to false when the text is about a single object, even if you found that object with a SPARQL query.") //
-                    .build()) //
                 .putDocument("mapStatement", Document.mapBuilder() //
                     .putString("type", "string") //
-                    .putString("description", "Required whenever mapIt is true, and omitted otherwise: a SPARQL SELECT statement, which you do not execute, that allows the end user to audit the results visually on a map by querying the lowest-level objects the answer is based on. It must select ?uri ?type ?code ?label ?wkt, retrieving ?wkt in an OPTIONAL block.") //
+                    .putString("description", "Optional. The SPARQL statement that lets the user visually audit your answer on a map, as described in the 'Map Statement' section. Required when your answer was produced using location information and the result is not ambiguous. Omit it otherwise.") //
                     .build()) //
                 .putDocument("reasoning", Document.mapBuilder() //
                     .putString("type", "string") //
                     .putString("description", "Optional reasoning information from the agent about how the response was produced.") //
                     .build()) //
                 .build()) //
-            .putList("required", List.of(Document.fromString("text"), Document.fromString("ambiguous"), Document.fromString("mapIt"))) //
+            .putList("required", List.of(Document.fromString("text"), Document.fromString("ambiguous"))) //
             .build()
             .unwrap());
 
@@ -207,9 +198,12 @@ public class BedrockService
      * Preserve your application's original session ID rather than exposing the
      * normalized AgentCore session ID.
      */
+    String mapStatement = MapStatementValidator.validate(response.getMapStatement());
+
     message.setSessionId(sessionId);
-    message.setMappable(response.getMapIt());
     message.setAmbiguous(response.getAmbiguous());
+    message.setMapStatement(mapStatement);
+    message.setMappable(mapStatement != null);
     message.setStatements(result.toolResponses()
         .stream() //
         .filter(t -> t.getName().equals(ToolService.QUERY_TOOL))
@@ -217,50 +211,14 @@ public class BedrockService
         .filter(s -> StringUtils.isNotBlank(s))
         .toList());
 
-    /*
-     * The map statement is only requested when mapIt is true. Drop a stray one
-     * so that the UI only offers "View on Map" for mappable answers.
-     */
-    if (Boolean.TRUE.equals(response.getMapIt()))
-    {
-      message.setMapStatement(MapStatementValidator.validate(response.getMapStatement()));
-    }
-    else if (StringUtils.isNotBlank(response.getMapStatement()))
-    {
-      log.warn("Ignoring map statement returned with mapIt=false: {}", response.getMapStatement());
-    }
-
     return message;
-  }
-
-  public String getLocationSparql(History history) throws InterruptedException, ExecutionException, TimeoutException
-  {
-    String text = history.toText();
-
-    log.info("Invoking SPARQL AgentCore harness {} with text: {}", properties.getSparqlAgentHarnessArn(), text);
-
-    String response = invokeHarness( //
-        properties.getSparqlAgentHarnessArn(), //
-        properties.getSparqlAgentHarnessEndpoint(), //
-        UUID.randomUUID().toString(), //
-        mapItPromptService.getPrompt(), //
-        text, //
-        null, // No custom model needed
-        new LinkedList<>()).text();
-
-    /*
-     * Retaining the workaround from the old implementation.-
-     */
-    response = response.replace("<REDACTED>", "sparql");
-
-    return stripCodeFence(response);
   }
 
   public String report(String sessionId, String inputText) throws InterruptedException, ExecutionException, TimeoutException
   {
     String response = invokeHarness( //
-        properties.getSparqlAgentHarnessArn(), //
-        properties.getSparqlAgentHarnessEndpoint(), //
+        properties.getChatAgentHarnessArn(), //
+        properties.getChatAgentHarnessEndpoint(), //
         UUID.randomUUID().toString(), //
         reportPromptService.getPrompt(), //
         inputText, //

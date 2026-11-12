@@ -130,14 +130,6 @@
           <button
             type="button"
             class="sidebar-tab"
-            [class.active]="activeSidebarTab === 'queries'"
-            (click)="setActiveSidebarTab('queries')"
-          >
-            Saved Queries
-          </button>
-          <button
-            type="button"
-            class="sidebar-tab"
             [class.active]="activeSidebarTab === 'facts'"
             (click)="setActiveSidebarTab('facts')"
           >
@@ -237,67 +229,6 @@
             <span>{{ choosingChatType ? 'Cancel' : 'New' }}</span>
           </p-button>
         }
-        @if (activeSidebarTab === 'queries') {
-          @if (savedQueries$ | async; as savedQueries) {
-            <div class="query-tabs">
-              @for (query of savedQueries; track query; let queryIndex = $index) {
-                <button
-                  type="button"
-                  class="query-tab"
-                  [id]="savedQueryElementId(query.id)"
-                  [class.highlight]="highlightSavedQueryId === query.id"
-                  (click)="openSavedQueryChat(query)"
-                >
-                  @if (editingSavedQueryId !== query.id) {
-                    <span class="query-title">
-                      #{{ queryIndex + 1 }}
-                      {{ query.title }}
-                    </span>
-                  }
-                  @if (editingSavedQueryId === query.id) {
-                    <input
-                      class="query-title-input"
-                      type="text"
-                      [(ngModel)]="editingSavedQueryTitle"
-                      (click)="$event.stopPropagation()"
-                      (keydown.enter)="saveSavedQueryTitle($event, query)"
-                      (keydown.escape)="cancelSavedQueryTitleEdit($event)"
-                      autocomplete="off"
-                    />
-                  }
-                  <span class="query-meta">
-                    {{ formatQueryMeta(query) }}
-                  </span>
-                  <span class="query-date">
-                    {{ formatQueryDate(query) }}
-                  </span>
-                  <span class="query-actions">
-                    <span
-                      class="query-action"
-                      title="View on Map"
-                      (click)="viewCachedQuery(query); $event.stopPropagation()"
-                    >
-                      <fa-icon [icon]="viewQueryIcon"></fa-icon>
-                    </span>
-                    <span
-                      class="query-action"
-                      title="Rename query"
-                      (click)="startEditingSavedQueryTitle($event, query)"
-                    >
-                      <fa-icon [icon]="edit"></fa-icon>
-                    </span>
-                    <span class="query-action" title="Delete query" (click)="deleteCachedQuery($event, query)">
-                      <fa-icon [icon]="deleteQueryIcon"></fa-icon>
-                    </span>
-                  </span>
-                </button>
-              }
-              @if (savedQueries.length === 0) {
-                <div class="empty-query-history">No saved queries yet.</div>
-              }
-            </div>
-          }
-        }
         @if (activeSidebarTab === 'facts') {
           <div class="query-tabs fact-list">
             @for (group of factGroups; track group.projectId) {
@@ -334,6 +265,11 @@
                     </div>
                   }
                   <span class="query-actions">
+                    @if (fact.mapStatement) {
+                      <span class="query-action" title="View map" (click)="viewFact($event, fact)">
+                        <fa-icon [icon]="mapIcon"></fa-icon>
+                      </span>
+                    }
                     <span class="query-action" title="Edit fact" (click)="editFact($event, fact)">
                       <fa-icon [icon]="edit"></fa-icon>
                     </span>
@@ -363,7 +299,7 @@
       <div class="sidebar-resize-handle" title="Resize sidebar" (mousedown)="startSidebarResize($event)"></div>
     }
 
-    <main class="chat-main" [class.report-layout]="isReportChat && !minimized" (click)="cancelSavedQueryTitleEdit()">
+    <main class="chat-main" [class.report-layout]="isReportChat && !minimized">
       @if (!minimized && isReportChat && activeReport; as report) {
         <section class="report-setup" aria-label="Report setup">
           <header class="report-setup-summary">
@@ -686,7 +622,7 @@
                             View on Map
                           </p-button>
                           @if (msg.savedQueryIndex; as savedIndex) {
-                            <p-button severity="secondary" (onClick)="saveOrScrollQuery($event, msg)">
+                            <p-button severity="secondary" (onClick)="mapIt(msg)">
                               <fa-icon [icon]="saveQueryIcon"></fa-icon>
                               <span>Saved Query #{{ savedIndex }}</span>
                             </p-button>

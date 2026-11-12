@@ -126,7 +126,10 @@
   flex: 0 0 auto;
 }
 
-p-tabs, p-tabpanels, p-tabpanel, graph-explorer {
+p-tabs,
+p-tabpanels,
+p-tabpanel,
+graph-explorer {
   height: 100%;
 }
 
@@ -146,7 +149,7 @@ p-tabs, p-tabpanels, p-tabpanel, graph-explorer {
 
 .map-back-button {
   position: absolute;
-  top: 4.25rem;
+  top: 1rem;
   left: 1rem;
   z-index: 25;
   pointer-events: auto;
@@ -155,74 +158,6 @@ p-tabs, p-tabpanels, p-tabpanel, graph-explorer {
 
 .map-back-button label {
   cursor: pointer;
-}
-
-.map-save-query-button {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  z-index: 25;
-  pointer-events: auto;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.18);
-}
-
-.map-save-query-button label {
-  cursor: pointer;
-}
-
-::ng-deep .save-query-dialog {
-  width: min(28rem, calc(100vw - 2rem));
-}
-
-.save-query-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  min-width: 0;
-}
-
-.save-query-form label {
-  color: var(--text-color);
-  font-weight: 650;
-}
-
-.save-query-form input {
-  width: 100%;
-  min-width: 0;
-  border: 1px solid var(--surface-border);
-  border-radius: 6px;
-  padding: 0.55rem 0.65rem;
-  color: var(--text-color);
-  background: var(--surface-card);
-  font: inherit;
-}
-
-.save-query-form input:focus {
-  border-color: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
-  outline: none;
-}
-
-.saved-query-details {
-  gap: 0.75rem;
-}
-
-.saved-query-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--surface-border);
-  border-radius: 6px;
-  background: var(--surface-section);
-  color: var(--text-color-secondary);
-}
-
-.saved-query-meta strong {
-  color: var(--text-color);
-  font-weight: 650;
-  text-align: right;
 }
 
 .results-panel {
@@ -508,8 +443,7 @@ results-table {
   z-index: 17;
   width: 10px;
   cursor: col-resize;
-  background:
-    linear-gradient(to right, transparent 0 4px, var(--surface-border) 4px 6px, transparent 6px 10px);
+  background: linear-gradient(to right, transparent 0 4px, var(--surface-border) 4px 6px, transparent 6px 10px);
   touch-action: none;
 }
 
@@ -517,8 +451,7 @@ results-table {
 .inspector-resizer:focus-visible,
 .graph-resizer:hover,
 .graph-resizer:focus-visible {
-  background:
-    linear-gradient(to right, transparent 0 3px, var(--primary-color) 3px 7px, transparent 7px 10px);
+  background: linear-gradient(to right, transparent 0 3px, var(--primary-color) 3px 7px, transparent 7px 10px);
   outline: none;
 }
 
@@ -530,8 +463,7 @@ results-table {
   z-index: 17;
   width: 10px;
   cursor: col-resize;
-  background:
-    linear-gradient(to right, transparent 0 4px, var(--surface-border) 4px 6px, transparent 6px 10px);
+  background: linear-gradient(to right, transparent 0 4px, var(--surface-border) 4px 6px, transparent 6px 10px);
   touch-action: none;
 }
 
@@ -647,7 +579,8 @@ results-table {
   z-index: 2;
 }
 
-.explorer-root.layout-disambiguate #disambiguate-header h2, .inspector-controls h2 {
+.explorer-root.layout-disambiguate #disambiguate-header h2,
+.inspector-controls h2 {
   margin: 0;
   font-weight: 650;
   line-height: 1.2;
@@ -747,11 +680,11 @@ results-table {
   overflow: hidden;
 }
 
-#graphExplorerContainer ::ng-deep .p-tabpanel:not([data-p-active='true']) {
+#graphExplorerContainer ::ng-deep .p-tabpanel:not([data-p-active="true"]) {
   display: none;
 }
 
-#graphExplorerContainer ::ng-deep .p-tabpanel[data-p-active='true'] {
+#graphExplorerContainer ::ng-deep .p-tabpanel[data-p-active="true"] {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
@@ -805,7 +738,6 @@ results-table {
 .legend ::ng-deep .p-panel-toggle-button svg {
   stroke-width: 5;
 }
-
 
 .legend:has(.p-panel:not(.p-panel-expanded)) {
   width: 160px;

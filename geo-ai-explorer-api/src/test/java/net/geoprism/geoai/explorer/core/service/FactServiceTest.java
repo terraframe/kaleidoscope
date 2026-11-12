@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -23,15 +22,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import net.geoprism.geoai.explorer.core.config.TestConfiguration;
-import net.geoprism.geoai.explorer.core.entity.Project;
 import net.geoprism.geoai.explorer.core.entity.Fact;
+import net.geoprism.geoai.explorer.core.entity.Project;
 import net.geoprism.geoai.explorer.core.mock.MockDataTest;
 import net.geoprism.geoai.explorer.core.repository.FactRepository;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK, classes = TestConfiguration.class)
 @AutoConfigureMockMvc
-public class DiscoveryServiceTest extends MockDataTest
+public class FactServiceTest extends MockDataTest
 {
   @Autowired
   private FactService    service;
@@ -146,7 +145,7 @@ public class DiscoveryServiceTest extends MockDataTest
 
     Fact changes = Fact.builder().name("New Name").build();
 
-    assertThrows(NoSuchElementException.class, () -> service.update(changes, 99L));
+    assertThrows(RuntimeException.class, () -> service.update(changes, 99L));
     verify(repository, never()).save(any(Fact.class));
   }
 

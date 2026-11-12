@@ -82,7 +82,6 @@ public class SpnChatPromptService extends ChatPromptService
     List<String> examples = super.buildExamples();
 
     examples.add(peopleInProjectArea());
-    examples.add(mapItExamples());
     examples.add(mapStatementExample());
 
     return examples;
@@ -163,25 +162,6 @@ public class SpnChatPromptService extends ChatPromptService
             ?structure obj:Structure-pop2pmu65 ?pop2pmu65 .
           }
         }
-        """;
-  }
-
-  protected String mapItExamples()
-  {
-    return """
-        =
-        The following is a list of examples intended to showcase how and when to use set the mapIt parameter as true
-        =
-
-        Q: What is the total population in the flood scenario with a code of '1'?
-        A: The total population in the project area with a code of '1' is 200.
-
-        Q: What is the most common land use for parcels in the project area with a code of 'Example Location'?
-        A: The most common land use for parcels in the project area with a code of 'Example Location' is Single Family.
-
-        - Do not include the #mapIt tag if the question is comparing multiple scenarios.  For example, the following should not include set mapIt as true:
-        Q: What is total value of structures at risk with the no mitigation scenario versus the combo plan mitigation scenario?
-        A: The total value of structures at risk with the no mitigation scenario is $1,000 versus the combo plan mitigation scenario which is $50.
         """;
   }
 }

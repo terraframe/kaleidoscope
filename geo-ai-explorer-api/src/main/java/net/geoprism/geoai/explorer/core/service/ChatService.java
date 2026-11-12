@@ -16,7 +16,6 @@
 package net.geoprism.geoai.explorer.core.service;
 
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -30,7 +29,6 @@ import org.springframework.stereotype.Service;
 import dev.failsafe.Failsafe;
 import dev.failsafe.RetryPolicy;
 import net.geoprism.geoai.explorer.core.model.GenericRestException;
-import net.geoprism.geoai.explorer.core.model.History;
 import net.geoprism.geoai.explorer.core.model.Location;
 import net.geoprism.geoai.explorer.core.model.LocationPage;
 import net.geoprism.geoai.explorer.core.model.Message;
@@ -48,30 +46,18 @@ public class ChatService
 
   public Message prompt(String sessionId, String inputText)
   {
-    RetryPolicy<Message> retryPolicy = RetryPolicy.<Message>builder()
-        .handle(Exception.class)
-        .withMaxAttempts(3)
-        .withDelay(Duration.ofMillis(250))
-        .onFailedAttempt(event -> {
-          Throwable failure = event.getLastException();
+    RetryPolicy<Message> retryPolicy = RetryPolicy.<Message> builder().handle(Exception.class).withMaxAttempts(3).withDelay(Duration.ofMillis(250)).onFailedAttempt(event -> {
+      Throwable failure = event.getLastException();
 
-          if (failure instanceof UnableToAssistResponseException)
-          {
-            log.warn(
-                "Chat prompt attempt {} returned an unable-to-assist response. Retrying.",
-                event.getAttemptCount()
-            );
-          }
-          else
-          {
-            log.warn(
-                "Chat prompt attempt {} failed with exception.",
-                event.getAttemptCount(),
-                failure
-            );
-          }
-        })
-        .build();
+      if (failure instanceof UnableToAssistResponseException)
+      {
+        log.warn("Chat prompt attempt {} returned an unable-to-assist response. Retrying.", event.getAttemptCount());
+      }
+      else
+      {
+        log.warn("Chat prompt attempt {} failed with exception.", event.getAttemptCount(), failure);
+      }
+    }).build();
 
     try
     {
@@ -102,89 +88,14 @@ public class ChatService
 
   private boolean isUnableToAssistResponse(Message message)
   {
-    return message != null &&
-        message.getContent() != null &&
-        message.getContent().toLowerCase().contains("i am unable to assist");
-  }
-
-  public List<LocationPage> getLocations(History history)
-  {
-    RetryPolicy<List<LocationPage>> retryPolicy = RetryPolicy.<List<LocationPage>>builder()
-        .handle(Exception.class)
-        .withMaxAttempts(3)
-        .withDelay(Duration.ofMillis(250))
-        .onFailedAttempt(event -> {
-          Throwable failure = event.getLastException();
-
-          if (failure instanceof EmptyLocationPageException)
-          {
-            log.warn(
-                "Location lookup attempt {} returned zero results. Retrying.",
-                event.getAttemptCount()
-            );
-          }
-          else
-          {
-            log.warn(
-                "Location lookup attempt {} failed with exception.",
-                event.getAttemptCount(),
-                failure
-            );
-          }
-        })
-        .build();
-
-    try
-    {
-      return Failsafe.with(retryPolicy).get(() -> {
-        String statement = this.bedrock.getLocationSparql(history);
-        LocationPage page = this.getPage(statement, null, history.getOffset(), history.getLimit());
-        List<LocationPage> pages = Arrays.asList(page);
-
-        if (pages.size() == 0 ||
-            pages.stream().mapToInt(p -> p.getLocations().size()).sum() == 0)
-        {
-          throw new EmptyLocationPageException(pages);
-        }
-
-        return pages;
-      });
-    }
-    catch (EmptyLocationPageException e)
-    {
-      log.info("Location lookup returned zero results after retries.");
-
-      return e.getPages();
-    }
-    catch (Exception e)
-    {
-      log.error("Error invoking a bedrock service after retries: ", e);
-
-      throw new GenericRestException(
-          "Unable to map the locations. An error occurred while generating the response",
-          e
-      );
-    }
-  }
-
-  private static class EmptyLocationPageException extends RuntimeException
-  {
-    List<LocationPage> pages;
-    
-    private EmptyLocationPageException(List<LocationPage> pages)
-    {
-      super("Location lookup returned zero results.");
-      this.pages = pages;
-    }
-    
-    public List<LocationPage> getPages() {
-      return pages;
-    }
+    return message != null && message.getContent() != null && message.getContent().toLowerCase().contains("i am unable to assist");
   }
 
   private static class UnableToAssistResponseException extends RuntimeException
   {
-    private final Message messageResponse;
+    private static final long serialVersionUID = -1972800538349812370L;
+
+    private final Message     messageResponse;
 
     private UnableToAssistResponseException(Message messageResponse)
     {
@@ -213,9 +124,7 @@ public class ChatService
     try
     {
       boolean combinedPage = type == null || type.isBlank();
-      String pageStatement = combinedPage
-          ? this.graph.buildExcludedTypesQuery(statement, excludedTypes)
-          : this.graph.buildTypeFilterQuery(statement, type);
+      String pageStatement = combinedPage ? this.graph.buildExcludedTypesQuery(statement, excludedTypes) : this.graph.buildTypeFilterQuery(statement, type);
 
       LocationPage page = new LocationPage();
       page.setType(combinedPage ? null : type);
@@ -250,9 +159,7 @@ public class ChatService
   public String exportPageCsv(String statement, String type, List<String> excludedTypes, String sortField, String sortDirection)
   {
     boolean combinedPage = type == null || type.isBlank();
-    String pageStatement = combinedPage
-        ? this.graph.buildExcludedTypesQuery(statement, excludedTypes)
-        : this.graph.buildTypeFilterQuery(statement, type);
+    String pageStatement = combinedPage ? this.graph.buildExcludedTypesQuery(statement, excludedTypes) : this.graph.buildTypeFilterQuery(statement, type);
     long count = this.graph.getCount(pageStatement);
     int limit = Math.toIntExact(Math.min(count, 100000L));
 
@@ -270,20 +177,14 @@ public class ChatService
   private String toCsv(List<Location> locations)
   {
     List<Location> rows = locations == null ? List.of() : locations;
-    Set<String> columns = rows.stream()
-        .flatMap(location -> location.getProperties().keySet().stream())
-        .filter(this::isExportableColumn)
-        .collect(Collectors.toCollection(LinkedHashSet::new));
+    Set<String> columns = rows.stream().flatMap(location -> location.getProperties().keySet().stream()).filter(this::isExportableColumn).collect(Collectors.toCollection(LinkedHashSet::new));
 
     StringBuilder csv = new StringBuilder();
     csv.append(columns.stream().map(this::escapeCsv).collect(Collectors.joining(","))).append("\n");
 
     for (Location location : rows)
     {
-      csv.append(columns.stream()
-          .map(column -> escapeCsv(location.getProperties().get(column)))
-          .collect(Collectors.joining(",")))
-          .append("\n");
+      csv.append(columns.stream().map(column -> escapeCsv(location.getProperties().get(column))).collect(Collectors.joining(","))).append("\n");
     }
 
     return csv.toString();
@@ -308,33 +209,21 @@ public class ChatService
 
     return mustQuote ? "\"" + text + "\"" : text;
   }
-  
+
   public String report(String sessionId, String inputText)
   {
-    RetryPolicy<String> retryPolicy = RetryPolicy.<String>builder()
-        .handle(Exception.class)
-        .withMaxAttempts(3)
-        .withDelay(Duration.ofMillis(250))
-        .onFailedAttempt(event -> {
-          Throwable failure = event.getLastException();
+    RetryPolicy<String> retryPolicy = RetryPolicy.<String> builder().handle(Exception.class).withMaxAttempts(3).withDelay(Duration.ofMillis(250)).onFailedAttempt(event -> {
+      Throwable failure = event.getLastException();
 
-          if (failure instanceof UnableToAssistResponseException)
-          {
-            log.warn(
-                "Chat prompt attempt {} returned an unable-to-assist response. Retrying.",
-                event.getAttemptCount()
-            );
-          }
-          else
-          {
-            log.warn(
-                "Chat prompt attempt {} failed with exception.",
-                event.getAttemptCount(),
-                failure
-            );
-          }
-        })
-        .build();
+      if (failure instanceof UnableToAssistResponseException)
+      {
+        log.warn("Chat prompt attempt {} returned an unable-to-assist response. Retrying.", event.getAttemptCount());
+      }
+      else
+      {
+        log.warn("Chat prompt attempt {} failed with exception.", event.getAttemptCount(), failure);
+      }
+    }).build();
 
     try
     {
@@ -349,6 +238,5 @@ public class ChatService
       throw new GenericRestException("The report agent was unable to generate a response. If your chat history is not relevant to the current request, you can try clearing your chat history and sending your message again.", e);
     }
   }
-
 
 }

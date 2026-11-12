@@ -1007,8 +1007,15 @@ public class GraphQueryService
       return;
     }
 
-    Map<String, Location> locationsById = locations.getLocations().stream().filter(location -> location.getId() != null).collect(Collectors.toMap(Location::getId, Function.identity(), (a, b) -> a));
-    List<Location> withIds = locations.getLocations().stream().filter(location -> location.getId() != null && !location.getId().isBlank()).toList();
+    Map<String, Location> locationsById = locations.getLocations()
+        .stream() //
+        .filter(location -> location.getId() != null)
+        .collect(Collectors.toMap(Location::getId, Function.identity(), (a, b) -> a));
+
+    List<Location> withIds = locations.getLocations()
+        .stream()
+        .filter(location -> location.getId() != null && !location.getId().isBlank()) //
+        .toList();
 
     int batchSize = 50;
 

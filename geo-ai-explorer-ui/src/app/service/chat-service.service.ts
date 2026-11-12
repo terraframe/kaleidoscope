@@ -147,6 +147,7 @@ export class ChatService {
       sortField,
       sortDirection
     );
+
     const cachedPages = this.explorerSessionState.getPages(cacheId);
     const cachedPage = cachedPages?.[0];
 

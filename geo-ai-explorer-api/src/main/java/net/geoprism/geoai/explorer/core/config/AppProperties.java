@@ -38,16 +38,6 @@ public class AppProperties
     return env.getProperty("bedrock.chat.agent.harnessEndpoint");
   }
 
-  public String getSparqlAgentHarnessArn()
-  {
-    return env.getProperty("bedrock.sparql.agent.harnessArn");
-  }
-
-  public String getSparqlAgentHarnessEndpoint()
-  {
-    return env.getProperty("bedrock.sparql.agent.harnessEndpoint");
-  }
-
   public Region getBedrockRegion()
   {
     String configured = getFirstNonBlankProperty("aws.region", "bedrock.region");
@@ -62,7 +52,7 @@ public class AppProperties
 
   public String getBedrockModel()
   {
-    return env.getProperty("bedrock.model", "us.openai.gpt-6.1-sol");
+    return env.getProperty("bedrock.model", "us.openai.gpt-5.6-terra");
   }
 
   public Region getNeptuneRegion()
