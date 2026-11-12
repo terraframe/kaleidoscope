@@ -125,6 +125,10 @@ public class BedrockService
                     .putString("type", "boolean") //
                     .putString("description", "true only when the name resolution tool returned more than one possible match and you are asking the user to choose between them. Otherwise false.") //
                     .build()) //
+                .putDocument("location", Document.mapBuilder() //
+                    .putString("type", "string") //
+                    .putString("description", "Optional. Name of the ambiguous location.  Must be specified if ambiguous is true.") //
+                    .build()) //
                 .putDocument("mapStatement", Document.mapBuilder() //
                     .putString("type", "string") //
                     .putString("description", "Optional. The SPARQL statement that lets the user visually audit your answer on a map, as described in the 'Map Statement' section. Required when your answer was produced using location information and the result is not ambiguous. Omit it otherwise.") //
@@ -202,6 +206,7 @@ public class BedrockService
 
     message.setSessionId(sessionId);
     message.setAmbiguous(response.getAmbiguous());
+    message.setLocation(response.getLocation());
     message.setMapStatement(mapStatement);
     message.setMappable(mapStatement != null);
     message.setStatements(result.toolResponses()

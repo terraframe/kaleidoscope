@@ -96,6 +96,7 @@ public class ChatPromptService
         Your final response is a JSON object with these fields:
         - text: The answer shown to the user, formatted as markdown. All of the rules for your final response below apply to this field.
         - ambiguous: true only when the name resolution tool returned more than one possible match and you are asking the user to choose between them. Otherwise false.
+        - location: Optional. Name of the ambiguous location. Must be specified if ambiguous is true.
         - mapStatement: Optional. The SPARQL statement that lets the user visually audit your answer on a map, as described in the 'Map Statement' section. Required when your answer was produced using location information and the result is not ambiguous. Omit it otherwise.
         - reasoning: Optional. Brief notes on how you produced the answer, such as the calculations you performed. Never put any part of the answer itself here.
 

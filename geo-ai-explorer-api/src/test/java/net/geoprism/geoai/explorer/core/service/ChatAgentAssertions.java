@@ -103,6 +103,22 @@ public final class ChatAgentAssertions
     return problems;
   }
 
+  /**
+   * Whenever the agent flags the response as ambiguous it must also identify
+   * the location name that was ambiguous.
+   */
+  public static List<String> checkLocationSetWhenAmbiguous(Message message)
+  {
+    List<String> problems = new ArrayList<>();
+
+    if (Boolean.TRUE.equals(message.getAmbiguous()) && ( message.getLocation() == null || message.getLocation().isBlank() ))
+    {
+      problems.add("location is not set although ambiguous is true. Content:\n" + message.getContent());
+    }
+
+    return problems;
+  }
+
   public static void assertNoProblems(List<String> problems)
   {
     if (!problems.isEmpty())

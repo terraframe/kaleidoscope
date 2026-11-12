@@ -9,6 +9,8 @@ public class PromptResponse
 
   private Boolean ambiguous;
 
+  private String  location;
+
   private String  reasoning;
 
   private String  mapStatement;

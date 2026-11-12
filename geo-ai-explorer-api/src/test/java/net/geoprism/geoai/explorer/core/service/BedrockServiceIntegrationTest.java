@@ -1,6 +1,7 @@
 package net.geoprism.geoai.explorer.core.service;
 
 import static net.geoprism.geoai.explorer.core.service.ChatAgentAssertions.assertNoProblems;
+import static net.geoprism.geoai.explorer.core.service.ChatAgentAssertions.checkLocationSetWhenAmbiguous;
 import static net.geoprism.geoai.explorer.core.service.ChatAgentAssertions.checkMapStatementMatchesMapIt;
 import static net.geoprism.geoai.explorer.core.service.ChatAgentAssertions.checkNoGeometryInExecutedQueries;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -12,6 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,6 +67,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
 
     Message message = service.prompt(sessionId, "Give me the value of a structure with the name 849W84F9+M6C-4-5-3-4");
 
+    assertNoProblems(checkLocationSetWhenAmbiguous(message));
+
     System.out.println(message.getContent());
 
     Assert.assertTrue(message.getContent().trim().length() > 0);
@@ -103,6 +107,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
 
     Message message = service.prompt(sessionId, "How many land parcels at risk with the no mitigation flood scenario?");
 
+    assertNoProblems(checkLocationSetWhenAmbiguous(message));
+
     Assert.assertTrue(message.getContent().trim().length() > 0);
     Assert.assertTrue(message.getContent().contains("200"));
     Assert.assertFalse(message.getAmbiguous());
@@ -139,7 +145,11 @@ public class BedrockServiceIntegrationTest extends MockDataTest
 
     Message message = service.prompt(UUID.randomUUID().toString(), "what is the total population of a structure with the name structure_25?");
 
+    assertNoProblems(checkLocationSetWhenAmbiguous(message));
+
     Assert.assertTrue("Failed with message: " + message.getContent(), message.getAmbiguous());
+    Assert.assertTrue("Ambiguous response did not set a location", StringUtils.isNotBlank(message.getLocation()));
+    Assert.assertEquals("structure_25", message.getLocation());
 
     // Nothing to audit while the user is still choosing between matches
     Assert.assertNull(message.getMapStatement());
@@ -152,6 +162,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
     when(queryService.select(anyString())).thenReturn(List.of(Map.of("totalPopulation", 5432)));
 
     Message message = service.prompt(UUID.randomUUID().toString(), "How many people are in the project area with a code of '1'?");
+
+    assertNoProblems(checkLocationSetWhenAmbiguous(message));
 
     System.out.println(message.getContent());
     System.out.println(message.getMapStatement());
@@ -174,6 +186,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
 
     Message message = service.prompt(UUID.randomUUID().toString(), "What is the total value of structures at risk with the no mitigation scenario versus the combo plan scenario?");
 
+    assertNoProblems(checkLocationSetWhenAmbiguous(message));
+
     System.out.println(message.getContent());
     System.out.println();
 
@@ -194,6 +208,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
   {
     Message message = service.prompt(UUID.randomUUID().toString(), "Hello! What kinds of questions can you help me with?");
 
+    assertNoProblems(checkLocationSetWhenAmbiguous(message));
+
     System.out.println(message.getContent());
 
     Assert.assertTrue(message.getContent().trim().length() > 0);
@@ -208,6 +224,8 @@ public class BedrockServiceIntegrationTest extends MockDataTest
     when(queryService.select(anyString())).thenReturn(List.of(Map.of("wkt", "POINT (-122.03 37.22)")));
 
     Message message = service.prompt(UUID.randomUUID().toString(), "What is the WKT geometry of the structure with the code 2012X?");
+
+    assertNoProblems(checkLocationSetWhenAmbiguous(message));
 
     System.out.println(message.getContent());
     message.getStatements().forEach(System.out::println);
