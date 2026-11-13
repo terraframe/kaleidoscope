@@ -1,6 +1,5 @@
 package net.geoprism.geoai.explorer.core.service;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -24,6 +23,7 @@ import net.geoprism.geoai.explorer.core.config.TestConfiguration;
 import net.geoprism.geoai.explorer.core.entity.Fact;
 import net.geoprism.geoai.explorer.core.entity.Project;
 import net.geoprism.geoai.explorer.core.mock.MockDataTest;
+import net.geoprism.geoai.explorer.core.model.SectionData;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK, classes = TestConfiguration.class)
@@ -119,33 +119,16 @@ public class ReportGenerationIntegrationTest extends MockDataTest
   @Test
   public void testReportGeneration() throws InterruptedException, ExecutionException, TimeoutException
   {
-    String input = """
-            Generate a report using template 'PLAN_EVAL' for project 1.  Use facts 1 and 2
-            in the National Economic Development (NED) Analysis section. Use facts
-            3 and 4 in the Regional Economic Development (RED) Analysis section.
-        """;
+    SectionData selection = SectionData.builder() //
+        .templateId("PLAN_EVAL") //
+        .projectId(1L) //
+        .factIds(List.of(1L, 2L)) //
+        .build();
 
     String sessionId = UUID.randomUUID().toString();
 
-    String report = service.report(sessionId, input);
+    String report = service.report(sessionId, selection);
 
     System.out.println(report);
   }
-
-  @Test
-  public void testFactSuggestions() throws InterruptedException, ExecutionException, TimeoutException
-  {
-    String input = """
-        Generate a report using template 'PLAN_EVAL' for project 1.  What facts are most appropriate for National Economic Development (NED) Analysis section?""";
-
-    String sessionId = UUID.randomUUID().toString();
-
-    String response = service.report(sessionId, input);
-
-    System.out.println(response);
-
-    assertTrue(response.toLowerCase().contains("**1") || response.toLowerCase().contains("fact 1"), "Failed assumption with response" + response);
-    assertTrue(response.toLowerCase().contains("**2") || response.toLowerCase().contains("fact 2"), "Failed assumption with response" + response);
-  }
-
 }

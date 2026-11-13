@@ -24,6 +24,9 @@
 		<jts.version>1.20.0</jts.version>
 		<!-- GeoTools is only used by the tests -->
 		<geotools.version>34.5</geotools.version>
+		<commonmark.version>0.24.0</commonmark.version>
+		<jsoup.version>1.18.3</jsoup.version>
+		<openhtmltopdf.version>1.1.22</openhtmltopdf.version>
 		<!-- Servlet context path for the cargo-run profile, e.g. -Dapp.context=/kaleidoscope -->
 		<app.context>/</app.context>
 	</properties>
@@ -130,6 +133,28 @@
 		</dependencies>
 	</dependencyManagement>
 	<dependencies>
+		<!-- Report PDF generation: markdown -> HTML (commonmark), parsed into a
+		     well-formed DOM (jsoup), rendered to PDF (openhtmltopdf) -->
+		<dependency>
+			<groupId>org.commonmark</groupId>
+			<artifactId>commonmark</artifactId>
+			<version>${commonmark.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.commonmark</groupId>
+			<artifactId>commonmark-ext-gfm-tables</artifactId>
+			<version>${commonmark.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>${jsoup.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.github.openhtmltopdf</groupId>
+			<artifactId>openhtmltopdf-pdfbox</artifactId>
+			<version>${openhtmltopdf.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>netty-nio-client</artifactId>

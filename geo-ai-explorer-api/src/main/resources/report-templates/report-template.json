@@ -1,0 +1,13 @@
+{
+  "id" : "BASIC",
+  "name" : "Cost Evaluation",
+  "description" : "Basic cost analysis report",
+  "references" : [ ],
+  "sections" : [ {
+    "name" : "National Economic Development (NED) Analysis",
+    "summary" : "The purpose of this section is to compare and contrast different alternative plans or flood scenarios for\n   their cost effectiveness at a national level, measured in terms of net benefits.\n",
+    "example" : "The final array alternatives were evaluated for their cost effectiveness, measured in terms of net benefits,\n   calculated by subtracting the annual costs from the expected annual economic benefits (Table 21). The\n   Combination Plan had the highest net annual benefits of the alternatives considered in the final array.\n   NED analysis assesses how the alternatives in the final array may reasonably maximize expected net\n   benefits. The net benefits are computed as the annualized flood damage reduction benefits gained minus\n   the annualized cost of construction and Operations, Maintenance, Repair, Rehabilitation and Replacement\n   (OMRR&R). Expected annual damages were estimated using the HEC-FDA computer program. Net\n   benefit computations for the focused array were evaluated based on October 2023 price levels.\n",
+    "required" : true
+  }
+ ]
+}

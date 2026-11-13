@@ -1,70 +1,65 @@
 import { Injectable } from '@angular/core';
-import { v4 as uuidv4 } from 'uuid';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 
-import { ChatMessage, Fact, Project } from '../models/chat.model';
-import { ReportSelection, ReportTemplate } from '../models/report.model';
+import { JobStartResponse } from '../models/chat.model';
+import { ReportSelection } from '../models/report.model';
+import { apiBase } from './url.util';
+import { pollJob } from './job-polling.util';
 
 /**
- * The report generation chat. Templates come with the app's configuration
- * (see getReportTemplates); projects and facts from ProjectService and
- * FactService.
+ * Client for net.geoprism.geoai.explorer.web.controller.ReportController.
  *
- * TODO: sendMessage is still a mock. POST /api/chat/report/start exists, but
- * only takes a session and prompt; it needs the template, facts by section
- * and section notes too.
+ * Report generation invokes a Bedrock AgentCore harness that can take several
+ * minutes -- well past the ALB's 60 second idle timeout -- so the server runs
+ * it as a background job:
+ *
+ * 1. POST /api/report/generate/start returns a job id immediately.
+ * 2. GET /api/report/generate/status/{jobId} is polled (see
+ *    job-polling.util.ts) until the job SUCCEEDS or FAILS. The PDF is left
+ *    out of the status payload.
+ * 3. GET /api/report/generate/result/{jobId} downloads the finished PDF.
  */
 @Injectable({
   providedIn: 'root',
 })
 export class ReportService {
+  constructor(private http: HttpClient) {}
+
   /**
-   * Sends a message to the report generation agent. Resolves with the
-   * agent's reply, like ChatService.sendMessage. `template`, `project` and
-   * `facts` are the selection's, already loaded by the caller.
+   * Generates a report from `selection` and resolves with the finished PDF.
+   *
+   * @param onJobStarted Invoked with the job id as soon as it is known, so the
+   * caller can persist it and pick the job back up via {@link resumeGenerate}
+   * if the page is reloaded before the job settles.
    */
-  sendMessage(
-    _sessionId: string,
-    message: ChatMessage,
-    selection: ReportSelection,
-    template: ReportTemplate | undefined,
-    project: Project | undefined,
-    facts: Fact[]
-  ): Promise<ChatMessage> {
-    const factName = (id: number) => facts.find((f) => f.id === id)?.name ?? `#${id}`;
-    const sections = (template?.sections ?? []).map((section) => {
-      const ids = selection.sectionFacts[section.name] ?? [];
-      const notes = selection.sectionNotes[section.name]?.trim();
-      return (
-        `- ${section.name}: ${ids.length > 0 ? ids.map(factName).join(', ') : '_no facts_'}` +
-        (notes ? ` (notes: "${notes}")` : '')
-      );
+  generate(selection: ReportSelection, onJobStarted?: (jobId: string) => void): Promise<Blob> {
+    return firstValueFrom(
+      this.http.post<JobStartResponse>(apiBase() + 'api/report/generate/start', selection)
+    ).then(({ jobId }) => {
+      onJobStarted?.(jobId);
+      return this.resumeGenerate(jobId);
     });
+  }
 
-    const lines = [
-      '_The report generation agent is not connected yet. This is a placeholder reply._',
-      '',
-      `**Template:** ${template?.name ?? 'none selected'}`,
-      `**Project:** ${project?.name ?? 'none selected'}`,
-      `**Facts:** ${facts.length > 0 ? facts.map((f) => f.name).join(', ') : 'none selected'}`,
-      ...(sections.length > 0 ? ['', '**Sections:**', ...sections] : []),
-      '',
-      `> ${message.text}`,
-    ];
+  /**
+   * Waits for a generate job previously started by {@link generate} to finish,
+   * then downloads its PDF.
+   */
+  resumeGenerate(jobId: string): Promise<Blob> {
+    const id = encodeURIComponent(jobId);
 
-    return new Promise((resolve) => {
-      setTimeout(
-        () =>
-          resolve({
-            id: uuidv4(),
-            sender: 'system',
-            text: lines.join('\n'),
-            mappable: false,
-            ambiguous: false,
-            purpose: 'standard',
-            statements: [],
-          }),
-        600
-      );
-    });
+    return pollJob<void>(this.http, apiBase() + 'api/report/generate/status/' + id).then(() =>
+      this.getResult(jobId)
+    );
+  }
+
+  /** Downloads the PDF of a generate job that has SUCCEEDED. */
+  getResult(jobId: string): Promise<Blob> {
+    return firstValueFrom(
+      this.http.get(apiBase() + 'api/report/generate/result/' + encodeURIComponent(jobId), {
+        responseType: 'blob',
+      })
+    );
   }
 }

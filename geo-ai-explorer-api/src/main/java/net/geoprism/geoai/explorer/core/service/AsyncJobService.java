@@ -196,7 +196,42 @@ public class AsyncJobService
 
     failIfStale(jobId, job);
 
-    return new JobStatusResponse(jobId, job.status.name(), job.result, job.errorMessage);
+    /*
+     * Binary results (e.g. a generated PDF) are left out of the status
+     * payload: Jackson would base64 encode them into every poll response.
+     * Clients download them separately via getResult().
+     */
+    Object result = job.result instanceof byte[] ? null : job.result;
+
+    return new JobStatusResponse(jobId, job.status.name(), result, job.errorMessage);
+  }
+
+  /**
+   * Returns the result of a job that has SUCCEEDED, for results that are
+   * downloaded rather than returned in the status payload. Throws if the job
+   * does not exist, has not succeeded, or its result is not of the given
+   * type.
+   */
+  public <T> T getResult(String jobId, Class<T> type)
+  {
+    Job job = this.jobs.get(jobId);
+
+    if (job == null)
+    {
+      throw new GenericRestException("The requested job could not be found. It may have expired -- please try your request again.");
+    }
+
+    if (job.status != Status.SUCCEEDED)
+    {
+      throw new GenericRestException("The requested job has not finished successfully.");
+    }
+
+    if (!type.isInstance(job.result))
+    {
+      throw new GenericRestException("The requested job does not have a result to download.");
+    }
+
+    return type.cast(job.result);
   }
 
   /**

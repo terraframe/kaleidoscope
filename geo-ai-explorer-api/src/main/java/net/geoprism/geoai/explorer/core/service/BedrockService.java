@@ -20,6 +20,7 @@ import net.geoprism.geoai.explorer.core.config.AppProperties;
 import net.geoprism.geoai.explorer.core.model.GenericRestException;
 import net.geoprism.geoai.explorer.core.model.Message;
 import net.geoprism.geoai.explorer.core.model.PromptResponse;
+import net.geoprism.geoai.explorer.core.model.SectionData;
 import net.geoprism.geoai.explorer.core.model.ToolResponse;
 import net.geoprism.geoai.explorer.core.service.prompt.ChatPromptService;
 import net.geoprism.geoai.explorer.core.service.prompt.ReportPromptService;
@@ -219,8 +220,10 @@ public class BedrockService
     return message;
   }
 
-  public String report(String sessionId, String inputText) throws InterruptedException, ExecutionException, TimeoutException
+  public String report(String sessionId, SectionData selection) throws InterruptedException, ExecutionException, TimeoutException
   {
+    String inputText = JsonMapper.shared().writeValueAsString(selection);
+
     String response = invokeHarness( //
         properties.getChatAgentHarnessArn(), //
         properties.getChatAgentHarnessEndpoint(), //
