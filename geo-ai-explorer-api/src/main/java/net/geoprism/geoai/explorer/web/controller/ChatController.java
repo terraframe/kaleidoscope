@@ -79,4 +79,25 @@ public class ChatController
     return new ResponseEntity<JobStatusResponse>(this.jobs.getStatus(jobId), HttpStatus.OK);
   }
 
+  /*
+   * See startPrompt() above -- getLocations() also invokes a Bedrock
+   * AgentCore harness (to translate the chat history into a SPARQL
+   * statement) and can exceed the load balancer's 60 second timeout, so it
+   * gets the same background-job treatment.
+   */
+  @PostMapping("/assistant/start")
+  @ResponseBody
+  public ResponseEntity<Map<String, String>> startReport(@RequestBody PromptRequest request)
+  {
+    String jobId = this.jobs.submit(() -> this.service.assistant(request.getSessionId(), request.getPrompt()));
+
+    return new ResponseEntity<Map<String, String>>(Map.of("jobId", jobId), HttpStatus.ACCEPTED);
+  }
+
+  @GetMapping("/assistant/status/{jobId}")
+  @ResponseBody
+  public ResponseEntity<JobStatusResponse> getReportStatus(@PathVariable(name = "jobId") String jobId)
+  {
+    return new ResponseEntity<JobStatusResponse>(this.jobs.getStatus(jobId), HttpStatus.OK);
+  }
 }

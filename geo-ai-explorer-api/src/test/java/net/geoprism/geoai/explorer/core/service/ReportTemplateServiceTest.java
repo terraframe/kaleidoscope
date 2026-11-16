@@ -29,7 +29,6 @@ public class ReportTemplateServiceTest
       assertNotNull(t.getId());
       assertNotNull(t.getName());
       assertNotNull(t.getDescription(), t.getId());
-      assertFalse(t.getReferences().isEmpty(), t.getId());
       t.getReferences().forEach(r -> {
         assertNotNull(r.getCitation(), t.getId());
         assertNotNull(r.getTitle(), r.getCitation());

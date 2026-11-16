@@ -686,80 +686,87 @@ export class AichatComponent {
     const systemMessageId = system.id;
     const sessionId = conversation.sessionId;
 
-    if (conversation.type === 'report') {
-      console.log('Unsupported');
-    } else {
-      const request = this.chatService.sendMessage(sessionId, message, (statusUrl) => {
-        // Persist the job's status URL onto the placeholder message so that
-        // if the page is closed or reloaded before the job settles,
-        // reconcilePendingJobs() can resume polling it (or fail it cleanly)
-        // on the next boot instead of leaving a permanent busy spinner.
-        system.pendingStatusUrl = statusUrl;
-        this.saveConversations();
+    const request =
+      conversation.type === 'report'
+        ? this.chatService.assistant(sessionId, message, (statusUrl) => {
+            // Persist the job's status URL onto the placeholder message so that
+            // if the page is closed or reloaded before the job settles,
+            // reconcilePendingJobs() can resume polling it (or fail it cleanly)
+            // on the next boot instead of leaving a permanent busy spinner.
+            system.pendingStatusUrl = statusUrl;
+            this.saveConversations();
+          })
+        : this.chatService.sendMessage(sessionId, message, (statusUrl) => {
+            // Persist the job's status URL onto the placeholder message so that
+            // if the page is closed or reloaded before the job settles,
+            // reconcilePendingJobs() can resume polling it (or fail it cleanly)
+            // on the next boot instead of leaving a permanent busy spinner.
+            system.pendingStatusUrl = statusUrl;
+            this.saveConversations();
+          });
+
+    request
+      .then((response) => {
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
+
+        if (!targetConversation) {
+          return;
+        }
+
+        const index = targetConversation.messages.findIndex((m) => m.id === systemMessageId);
+
+        if (index !== -1) {
+          targetConversation.messages[index] = parseText({
+            ...system,
+            text: response.text,
+            mappable: response.mappable,
+            ambiguous: response.ambiguous,
+            loading: false,
+            location: response.location,
+            reasoning: response.reasoning,
+            statements: response.statements ?? [],
+            mapStatement: response.mapStatement ?? null,
+            pendingStatusUrl: undefined,
+          });
+
+          this.refreshRenderedMessages();
+          this.saveConversations();
+        }
+      })
+      .catch((error) => {
+        console.log('Error', error);
+        this.errorService.handleError(error);
+
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
+
+        if (!targetConversation) {
+          return;
+        }
+
+        const index = targetConversation.messages.findIndex((m) => m.id === systemMessageId);
+
+        if (index !== -1) {
+          targetConversation.messages[index] = {
+            ...system,
+            text: 'An error occurred',
+            loading: false,
+            purpose: 'info',
+            pendingStatusUrl: undefined,
+          };
+
+          this.refreshRenderedMessages();
+          this.saveConversations();
+        }
+      })
+      .finally(() => {
+        const targetConversation = this.conversations.find((c) => c.id === conversationId);
+
+        if (targetConversation) {
+          targetConversation.loading = false;
+          this.refreshRenderedMessages();
+          this.saveConversations();
+        }
       });
-
-      request
-        .then((response) => {
-          const targetConversation = this.conversations.find((c) => c.id === conversationId);
-
-          if (!targetConversation) {
-            return;
-          }
-
-          const index = targetConversation.messages.findIndex((m) => m.id === systemMessageId);
-
-          if (index !== -1) {
-            targetConversation.messages[index] = parseText({
-              ...system,
-              text: response.text,
-              mappable: response.mappable,
-              ambiguous: response.ambiguous,
-              loading: false,
-              location: response.location,
-              reasoning: response.reasoning,
-              statements: response.statements ?? [],
-              mapStatement: response.mapStatement ?? null,
-              pendingStatusUrl: undefined,
-            });
-
-            this.refreshRenderedMessages();
-            this.saveConversations();
-          }
-        })
-        .catch((error) => {
-          this.errorService.handleError(error);
-
-          const targetConversation = this.conversations.find((c) => c.id === conversationId);
-
-          if (!targetConversation) {
-            return;
-          }
-
-          const index = targetConversation.messages.findIndex((m) => m.id === systemMessageId);
-
-          if (index !== -1) {
-            targetConversation.messages[index] = {
-              ...system,
-              text: 'An error occurred',
-              loading: false,
-              purpose: 'info',
-              pendingStatusUrl: undefined,
-            };
-
-            this.refreshRenderedMessages();
-            this.saveConversations();
-          }
-        })
-        .finally(() => {
-          const targetConversation = this.conversations.find((c) => c.id === conversationId);
-
-          if (targetConversation) {
-            targetConversation.loading = false;
-            this.refreshRenderedMessages();
-            this.saveConversations();
-          }
-        });
-    }
   }
 
   /**

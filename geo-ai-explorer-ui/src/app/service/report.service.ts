@@ -34,12 +34,12 @@ export class ReportService {
    * if the page is reloaded before the job settles.
    */
   generate(selection: ReportSelection, onJobStarted?: (jobId: string) => void): Promise<Blob> {
-    return firstValueFrom(
-      this.http.post<JobStartResponse>(apiBase() + 'api/report/generate/start', selection)
-    ).then(({ jobId }) => {
-      onJobStarted?.(jobId);
-      return this.resumeGenerate(jobId);
-    });
+    return firstValueFrom(this.http.post<JobStartResponse>(apiBase() + 'api/report/generate/start', selection)).then(
+      ({ jobId }) => {
+        onJobStarted?.(jobId);
+        return this.resumeGenerate(jobId);
+      }
+    );
   }
 
   /**
@@ -49,9 +49,7 @@ export class ReportService {
   resumeGenerate(jobId: string): Promise<Blob> {
     const id = encodeURIComponent(jobId);
 
-    return pollJob<void>(this.http, apiBase() + 'api/report/generate/status/' + id).then(() =>
-      this.getResult(jobId)
-    );
+    return pollJob<void>(this.http, apiBase() + 'api/report/generate/status/' + id).then(() => this.getResult(jobId));
   }
 
   /** Downloads the PDF of a generate job that has SUCCEEDED. */

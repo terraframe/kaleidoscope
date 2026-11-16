@@ -228,7 +228,7 @@ public class BedrockService
         properties.getChatAgentHarnessArn(), //
         properties.getChatAgentHarnessEndpoint(), //
         UUID.randomUUID().toString(), //
-        reportPromptService.getPrompt(), //
+        reportPromptService.getReportGenerationPrompt(), //
         inputText, //
         null, // No custom model needed
         toolService.getReportTools()).text();
@@ -239,6 +239,24 @@ public class BedrockService
     response = response.replace("<REDACTED>", "sparql");
 
     return stripCodeFence(response);
+  }
+
+  public Message assistant(String sessionId, String inputText) throws InterruptedException, ExecutionException, TimeoutException
+  {
+    String response = invokeHarness( //
+        properties.getChatAgentHarnessArn(), //
+        properties.getChatAgentHarnessEndpoint(), //
+        UUID.randomUUID().toString(), //
+        reportPromptService.getReportAssistantPrompt(), //
+        inputText, //
+        null, // No custom model needed
+        toolService.getReportTools()).text();
+
+    Message message = new Message();
+    message.setContent(response);
+    message.setSessionId(sessionId);
+
+    return message;
   }
 
   private ToolExecution executeToolCall(ToolCall call)

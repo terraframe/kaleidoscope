@@ -30,6 +30,24 @@ import net.geoprism.geoai.explorer.core.model.Message;
 @Service
 public class ChatService
 {
+  private static class UnableToAssistResponseException extends RuntimeException
+  {
+    private static final long serialVersionUID = -1972800538349812370L;
+
+    private final Message     messageResponse;
+
+    private UnableToAssistResponseException(Message messageResponse)
+    {
+      super("Chat agent returned unable-to-assist response.");
+      this.messageResponse = messageResponse;
+    }
+
+    public Message getMessageResponse()
+    {
+      return messageResponse;
+    }
+  }
+
   private static final Logger log = LoggerFactory.getLogger(ChatService.class);
 
   @Autowired
@@ -37,18 +55,23 @@ public class ChatService
 
   public Message prompt(String sessionId, String inputText)
   {
-    RetryPolicy<Message> retryPolicy = RetryPolicy.<Message> builder().handle(Exception.class).withMaxAttempts(3).withDelay(Duration.ofMillis(250)).onFailedAttempt(event -> {
-      Throwable failure = event.getLastException();
+    RetryPolicy<Message> retryPolicy = RetryPolicy.<Message> builder() //
+        .handle(Exception.class) //
+        .withMaxAttempts(3) //
+        .withDelay(Duration.ofMillis(250)) //
+        .onFailedAttempt(event -> {
+          Throwable failure = event.getLastException();
 
-      if (failure instanceof UnableToAssistResponseException)
-      {
-        log.warn("Chat prompt attempt {} returned an unable-to-assist response. Retrying.", event.getAttemptCount());
-      }
-      else
-      {
-        log.warn("Chat prompt attempt {} failed with exception.", event.getAttemptCount(), failure);
-      }
-    }).build();
+          if (failure instanceof UnableToAssistResponseException)
+          {
+            log.warn("Chat prompt attempt {} returned an unable-to-assist response. Retrying.", event.getAttemptCount());
+          }
+          else
+          {
+            log.warn("Chat prompt attempt {} failed with exception.", event.getAttemptCount(), failure);
+          }
+        })
+        .build();
 
     try
     {
@@ -77,26 +100,55 @@ public class ChatService
     }
   }
 
+  public Message assistant(String sessionId, String inputText)
+  {
+    RetryPolicy<Message> retryPolicy = RetryPolicy.<Message> builder() //
+        .handle(Exception.class) //
+        .withMaxAttempts(3) //
+        .withDelay(Duration.ofMillis(250)) //
+        .onFailedAttempt(event -> {
+          Throwable failure = event.getLastException();
+
+          if (failure instanceof UnableToAssistResponseException)
+          {
+            log.warn("Chat prompt attempt {} returned an unable-to-assist response. Retrying.", event.getAttemptCount());
+          }
+          else
+          {
+            log.warn("Chat prompt attempt {} failed with exception.", event.getAttemptCount(), failure);
+          }
+        })
+        .build();
+    try
+    {
+      return Failsafe.with(retryPolicy).get(() -> {
+        Message message = this.bedrock.assistant(sessionId, inputText);
+
+        if (isUnableToAssistResponse(message))
+        {
+          throw new UnableToAssistResponseException(message);
+        }
+
+        return message;
+      });
+    }
+    catch (UnableToAssistResponseException e)
+    {
+      log.error("Chat agent returned unable-to-assist response after retries.");
+
+      return e.getMessageResponse();
+    }
+    catch (Exception e)
+    {
+      log.error("Error invoking a remote service after retries: ", e);
+
+      throw new GenericRestException("The chat agent was unable to generate a response. If your chat history is not relevant to the current request, you can try clearing your chat history and sending your message again.", e);
+    }
+  }
+
   private boolean isUnableToAssistResponse(Message message)
   {
     return message != null && message.getContent() != null && message.getContent().toLowerCase().contains("i am unable to assist");
   }
 
-  private static class UnableToAssistResponseException extends RuntimeException
-  {
-    private static final long serialVersionUID = -1972800538349812370L;
-
-    private final Message     messageResponse;
-
-    private UnableToAssistResponseException(Message messageResponse)
-    {
-      super("Chat agent returned unable-to-assist response.");
-      this.messageResponse = messageResponse;
-    }
-
-    public Message getMessageResponse()
-    {
-      return messageResponse;
-    }
-  }
 }

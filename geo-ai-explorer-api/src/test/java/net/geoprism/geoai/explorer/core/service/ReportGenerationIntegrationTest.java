@@ -122,6 +122,7 @@ public class ReportGenerationIntegrationTest extends MockDataTest
     SectionData selection = SectionData.builder() //
         .templateId("PLAN_EVAL") //
         .projectId(1L) //
+        .name("National Economic Development (NED) Analysis")
         .factIds(List.of(1L, 2L)) //
         .build();
 

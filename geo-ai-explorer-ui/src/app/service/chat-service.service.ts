@@ -62,6 +62,35 @@ export class ChatService {
   }
 
   /**
+   * @param onJobStarted Invoked synchronously (before the job completes)
+   * with the job's status URL, as soon as it's known. AichatComponent uses
+   * this to stamp the status URL onto its "AI is thinking" placeholder
+   * message and persist it, so that if the page is closed or reloaded
+   * before the job settles, it can resume polling (or fail the message
+   * cleanly) on the next boot via {@link resumePrompt}.
+   */
+  assistant(sessionId: string, message: ChatMessage, onJobStarted?: (statusUrl: string) => void): Promise<ChatMessage> {
+    if (environment.mockRequests) {
+      return new Promise<ChatMessage>((resolve) => {
+        setTimeout(() => {
+          resolve(MockUtil.message);
+        }, 500); // Simulating network delay
+      });
+    } else {
+      // Sent in the body so long prompts aren't limited by URL length
+      const params = { sessionId: sessionId, prompt: message.text };
+
+      return firstValueFrom(this.http.post<JobStartResponse>(apiBase() + 'api/chat/assistant/start', params))
+        .then(({ jobId }) => {
+          const statusUrl = apiBase() + 'api/chat/assistant/status/' + jobId;
+          onJobStarted?.(statusUrl);
+          return pollJob<ServerChatResponse>(this.http, statusUrl);
+        })
+        .then((response) => this.toChatMessage(response));
+    }
+  }
+
+  /**
    * Resumes polling a chat/prompt job from a status URL that was previously
    * handed to `onJobStarted` in {@link sendMessage}. Used on app boot to
    * recover a message that was left mid-flight because the page was closed
