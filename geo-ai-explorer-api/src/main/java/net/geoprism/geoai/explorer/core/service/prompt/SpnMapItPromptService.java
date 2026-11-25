@@ -59,40 +59,46 @@ public class SpnMapItPromptService extends MapItPromptService
     The following is the full list of edges between the types in the system. If an edge is not explicitly listed here between two types, you must assume the data does not exist and the path cannot be used to resolve a query.
     
     The relationship format is described as (SourceType)->[EdgeType]->(TargetType) and is directional from left to right. If a relationship is bi-directional it will be listed twice, one in each direction.
+
+    (obj:FloodScenario)->[obj:HasFloodRisk]->(obj:Road)
+    (obj:FloodScenario)->[obj:HasFloodRisk]->(obj:LandParcel)
     
+    (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanBridge)
+    (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanFloodwall)
+    (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanSlopeRepair)
+    (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanChannelFtprnt)
+    (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanPropGravel)
+    (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanPropRiprap)
     
-    (cwbi:Remis_Project)->[cwbi:Program]->(cwbi:Program)
-    (obj:CensusTract)->[obj:TractAtRisk]->(obj:LeveedArea)
-    (obj:ChannelReach)->[obj:ChannelHasLevee]->(obj:LeveeArea) 
-    (obj:ChannelReach)->[obj:FlowsInto]->(obj:ChannelReach)
-    (obj:LeveeArea)->[obj:HasFloodZone]->(obj:LeveedArea)
-    (obj:LeveedArea)->[obj:HasFloodRisk]->(obj:Hospital)
-    (obj:LeveedArea)->[obj:HasFloodRisk]->(obj:RealProperty)
-    (obj:LeveedArea)->[obj:HasFloodRisk]->(obj:School)
-    (obj:SchoolZone)->[obj:HasSchoolZone]->(obj:School)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:School)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:Hospital)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:Project)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:RealProperty)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:UsaceRecreationArea)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:RecreationArea)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:Dam)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:LeveeArea)
-    (obj:InundationArea)->[obj:InundatedObject]->(obj:LeveedArea)
+    (obj:FloodScenario)->[obj:HasLevee]->(obj:Levee)
+    (obj:ProjectArea)->[obj:HasLevee]->(obj:Levee)
+    
+    (obj:ComboPlanBridge)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:ComboPlanFloodwall)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:ComboPlanSlopeRepair)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:ComboPlanChannelFtprnt)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:ComboPlanPropGravel)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:ComboPlanPropRiprap)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:ProjectReach)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:Road)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:Lake)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:Structure)->[obj:LocatedIn]->(obj:ProjectArea)
+    (obj:Structure)->[obj:LocatedIn]->(obj:LandParcel)
     
     (obj:Structure)->[obj:Structure-occupancyType]->(obj:OccupancyType)
     (obj:OccupancyType)->[obj:OccupancyTypeNarrower]->(obj:OccupancyType)
     
-    The obj:ConnectedTo can be used bi-directionally with any of the following types as a source or target:
-    obj:RecreationArea, obj:WaterBody, obj:UsaceRecreationArea, obj:Project, obj:LandTransportation, obj:ChannelArea, obj:ChannelReach, obj:Waterway, obj:LeveeArea, obj:WaterTransportation.
+    The obj:FlowsInto edge can be used bi-directionally with any of the following types as a source or target:
+    obj:Creek, obj:Lake, obj:ProjectReach.
+    
     
     Examples:
     
     Valid:
-    ?leveedArea obj:HasFloodRisk ?school .
+    ?scenario obj:HasFloodRisk ?landParcel .
     
     INVALID:
-    ?school obj:HasFloodRisk ?leveedArea .
+    ?landParcel obj:HasFloodRisk ?scenario .
     
     Why?
     Because you did not respect the order of the relationship!
