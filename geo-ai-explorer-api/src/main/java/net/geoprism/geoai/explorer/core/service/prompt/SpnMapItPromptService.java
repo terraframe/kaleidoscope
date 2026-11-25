@@ -44,6 +44,7 @@ public class SpnMapItPromptService extends MapItPromptService
     obj:ProjectArea, List of different project areas
     obj:Structure, List of structures
     obj:Levee, Contains levee data
+    obj:OccupancyType, NSI occupancy type concepts used to classify structures. These are not locations and have no geometry.
         """;
   }
   
@@ -78,6 +79,9 @@ public class SpnMapItPromptService extends MapItPromptService
     (obj:InundationArea)->[obj:InundatedObject]->(obj:Dam)
     (obj:InundationArea)->[obj:InundatedObject]->(obj:LeveeArea)
     (obj:InundationArea)->[obj:InundatedObject]->(obj:LeveedArea)
+    
+    (obj:Structure)->[obj:Structure-occupancyType]->(obj:OccupancyType)
+    (obj:OccupancyType)->[obj:OccupancyTypeNarrower]->(obj:OccupancyType)
     
     The obj:ConnectedTo can be used bi-directionally with any of the following types as a source or target:
     obj:RecreationArea, obj:WaterBody, obj:UsaceRecreationArea, obj:Project, obj:LandTransportation, obj:ChannelArea, obj:ChannelReach, obj:Waterway, obj:LeveeArea, obj:WaterTransportation.
@@ -117,6 +121,7 @@ public class SpnMapItPromptService extends MapItPromptService
     obj:LandParcel, obj:LandParcel-lotAcres, Number. Specifies the total acres of the parcel
     obj:Structure, obj:Structure-valStruct, Number. Value of the physical structure
     obj:Structure, obj:Structure-valContents, Number. Value of the contents inside of the structure
+    obj:Structure, obj:Structure-occupancyType, IRI of an obj:OccupancyType concept. The NSI occupancy type of the structure, such as single-family home, retail or school. See the Occupancy Type section below.
     
     Additionally, there are four population metrics you can use to answer questions about the population:
     
@@ -132,7 +137,7 @@ public class SpnMapItPromptService extends MapItPromptService
   @Override
   protected String schemaAddendum()
   {
-    return """
+    return joinComponents("""
         =
         Flood Scenario
         =
@@ -155,7 +160,7 @@ public class SpnMapItPromptService extends MapItPromptService
         Structure -> LocatedIn -> LandParcel
         
         If the user asks about what Inundation scenarios are available, query obj:FloodScenario and return the results (along with #mapit).
-              """;
+              """, SharedPrompt.spnOccupancyTypes());
   }
   
   @Override
@@ -166,6 +171,7 @@ public class SpnMapItPromptService extends MapItPromptService
     examples.add(populationUnder65());
     examples.add(noMitigation());
     examples.add(listFloodScenarios());
+    examples.add(hospitalsAtFloodRisk());
     
     return examples;
   }
@@ -267,6 +273,44 @@ public class SpnMapItPromptService extends MapItPromptService
               ?uri rdfs:label ?label .
               ?uri geo:hasGeometry ?geometry .
               ?geometry geo:asWKT ?wkt .
+            }
+            LIMIT 100
+            """;
+  }
+  
+  protected String hospitalsAtFloodRisk()
+  {
+    return """
+            =
+            Structures of an occupancy type at flood risk
+            =
+            
+            User:
+            {"messages":[{"type":"USER","content":"Show me the hospitals at flood risk in the combo plan scenario"}],"limit":100,"offset":0}
+            
+            Agent:
+            PREFIX obj: <https://spn.geoprism.net#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+            PREFIX sf: <http://www.opengis.net/ont/sf#>
+            
+            SELECT DISTINCT ?uri ?type ?code ?label ?wkt
+            FROM <https://spn.geoprism.net/spn>
+            WHERE {
+              ?scenario rdf:type obj:FloodScenario .
+              ?scenario obj:GeoObject-code "2" .
+              ?scenario obj:HasFloodRisk ?parcel .
+              ?uri obj:LocatedIn ?parcel .
+              ?uri obj:Structure-occupancyType ?occupancyType .
+              obj:OccupancyType-COM6 obj:OccupancyTypeNarrower* ?occupancyType .
+              ?uri rdf:type ?type .
+              ?uri obj:GeoObject-code ?code .
+              ?uri rdfs:label ?label .
+              ?uri geo:hasGeometry ?geometry .
+              ?geometry geo:asWKT ?wkt .
+            
+              FILTER(?type IN (obj:Structure))
             }
             LIMIT 100
             """;

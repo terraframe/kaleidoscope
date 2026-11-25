@@ -60,6 +60,7 @@ public class SpnChatPromptService extends ChatPromptService
     obj:ProjectArea, List of different project areas
     obj:Structure, List of structures
     obj:Levee, Contains levee data
+    obj:OccupancyType, NSI occupancy type concepts used to classify structures. These are not locations and have no geometry.
         """;
   }
   
@@ -99,6 +100,9 @@ public class SpnChatPromptService extends ChatPromptService
     (obj:Lake)->[obj:LocatedIn]->(obj:ProjectArea)
     (obj:Structure)->[obj:LocatedIn]->(obj:ProjectArea)
     (obj:Structure)->[obj:LocatedIn]->(obj:LandParcel)
+    
+    (obj:Structure)->[obj:Structure-occupancyType]->(obj:OccupancyType)
+    (obj:OccupancyType)->[obj:OccupancyTypeNarrower]->(obj:OccupancyType)
     
     The obj:FlowsInto edge can be used bi-directionally with any of the following types as a source or target:
     obj:Creek, obj:Lake, obj:ProjectReach.
@@ -140,6 +144,7 @@ public class SpnChatPromptService extends ChatPromptService
     obj:LandParcel, obj:LandParcel-lotAcres, Number. Specifies the total acres of the parcel
     obj:Structure, obj:Structure-valStruct, Number. Value of the physical structure
     obj:Structure, obj:Structure-valContents, Number. Value of the contents inside of the structure
+    obj:Structure, obj:Structure-occupancyType, IRI of an obj:OccupancyType concept. The NSI occupancy type of the structure, such as single-family home, retail or school. See the Occupancy Type section below.
     
     Additionally, there are four population metrics you can use to answer questions about the population:
     
@@ -155,7 +160,7 @@ public class SpnChatPromptService extends ChatPromptService
   @Override
   protected String schemaAddendum()
   {
-    return """
+    return joinComponents("""
         =
         Flood Scenario
         =
@@ -176,7 +181,7 @@ public class SpnChatPromptService extends ChatPromptService
         Structure -> LocatedIn -> LandParcel
         
         If the user asks about what Inundation scenarios are available, query obj:FloodScenario and return the results (along with #mapit).
-              """;
+              """, SharedPrompt.spnOccupancyTypes());
   }
   
   @Override
@@ -185,6 +190,8 @@ public class SpnChatPromptService extends ChatPromptService
     List<String> examples = super.buildExamples();
     
     examples.add(peopleInProjectArea());
+    examples.add(singleFamilyHomesAtFloodRisk());
+    examples.add(structuresByOccupancyType());
     examples.add(mapItExamples());
     
     return examples;
@@ -212,6 +219,57 @@ public class SpnChatPromptService extends ChatPromptService
                 ?structure obj:Structure-pop2pmu65 ?pop2pmu65 . 
               }
             }
+            """;
+  }
+  
+  protected String singleFamilyHomesAtFloodRisk()
+  {
+    return """
+            =
+            How many single-family homes are at flood risk in the no mitigation scenario?
+            =
+            
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX obj: <https://spn.geoprism.net#>
+            
+            SELECT (COUNT(DISTINCT ?structure) as ?totalHomes) 
+            FROM <https://spn.geoprism.net/spn>
+            WHERE {
+              ?scenario rdf:type obj:FloodScenario .
+              ?scenario obj:GeoObject-code "1" .
+              ?scenario obj:HasFloodRisk ?parcel .
+              ?structure obj:LocatedIn ?parcel .
+              ?structure rdf:type obj:Structure .
+              ?structure obj:Structure-occupancyType ?occupancyType .
+              obj:OccupancyType-RES1 obj:OccupancyTypeNarrower* ?occupancyType .
+            }
+            """;
+  }
+  
+  protected String structuresByOccupancyType()
+  {
+    return """
+            =
+            What kinds of buildings are in the project area with a code of "1"?
+            =
+            
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX obj: <https://spn.geoprism.net#>
+            
+            SELECT ?occupancyTypeLabel (COUNT(DISTINCT ?structure) as ?totalStructures) 
+            FROM <https://spn.geoprism.net/spn>
+            WHERE {
+              ?projectArea rdf:type obj:ProjectArea .  
+              ?projectArea obj:GeoObject-code "1" .
+              ?structure obj:LocatedIn ?projectArea .
+              ?structure rdf:type obj:Structure .
+              ?structure obj:Structure-occupancyType ?occupancyType .
+              ?occupancyType rdfs:label ?occupancyTypeLabel .
+            }
+            GROUP BY ?occupancyTypeLabel
+            ORDER BY DESC(?totalStructures)
             """;
   }
   
