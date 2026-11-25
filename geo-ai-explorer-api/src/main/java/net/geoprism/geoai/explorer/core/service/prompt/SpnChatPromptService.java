@@ -59,6 +59,7 @@ public class SpnChatPromptService extends ChatPromptService
     obj:ProjectReach, List of channel reaches in the project 
     obj:ProjectArea, List of different project areas
     obj:Structure, List of structures
+    obj:Levee, Contains levee data
         """;
   }
   
@@ -83,6 +84,9 @@ public class SpnChatPromptService extends ChatPromptService
     (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanChannelFtprnt)
     (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanPropGravel)
     (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanPropRiprap)
+    
+    (obj:FloodScenario)->[obj:HasLevee]->(obj:Levee)
+    (obj:ProjectArea)->[obj:HasLevee]->(obj:Levee)
     
     (obj:ComboPlanBridge)->[obj:LocatedIn]->(obj:ProjectArea)
     (obj:ComboPlanFloodwall)->[obj:LocatedIn]->(obj:ProjectArea)

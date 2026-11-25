@@ -43,6 +43,7 @@ public class SpnMapItPromptService extends MapItPromptService
     obj:ProjectReach, List of channel reaches in the project 
     obj:ProjectArea, List of different project areas
     obj:Structure, List of structures
+    obj:Levee, Contains levee data
         """;
   }
   
