@@ -78,6 +78,7 @@ public class SpnChatPromptService extends ChatPromptService
 
     (obj:FloodScenario)->[obj:HasFloodRisk]->(obj:Road)
     (obj:FloodScenario)->[obj:HasFloodRisk]->(obj:LandParcel)
+    (obj:FloodScenario)->[obj:HasFloodRisk]->(obj:Structure)
     
     (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanBridge)
     (obj:FloodScenario)->[obj:HasMitigation]->(obj:ComboPlanFloodwall)
@@ -176,9 +177,12 @@ public class SpnChatPromptService extends ChatPromptService
         
         (obj:FloodScenario) -> [obj:HasFloodRisk] -> ...
         
-        Answering questions about flooded structures, for example, might require traversing multiple edges, i.e.
-        FloodScenario -> HasFloodRisk -> LandParcel
-        Structure -> LocatedIn -> LandParcel
+        Structures at flood risk are linked directly to the scenario:
+        FloodScenario -> HasFloodRisk -> Structure
+        
+        Always use this direct relationship for questions about structures, buildings, homes, people (population) or the value of structures or contents at flood risk. Never find structures at risk through land parcels (FloodScenario -> HasFloodRisk -> LandParcel <- LocatedIn <- Structure). A parcel is at risk when any part of it touches the flood extent, so that path also counts structures that are outside the flood and overstates the results.
+        
+        Use FloodScenario -> HasFloodRisk -> LandParcel only for questions about the land parcels themselves, such as the number, acreage or land use of parcels at risk.
         
         If the user asks about what Inundation scenarios are available, query obj:FloodScenario and return the results (along with #mapit).
               """, SharedPrompt.spnOccupancyTypes());
@@ -238,8 +242,7 @@ public class SpnChatPromptService extends ChatPromptService
             WHERE {
               ?scenario rdf:type obj:FloodScenario .
               ?scenario obj:GeoObject-code "1" .
-              ?scenario obj:HasFloodRisk ?parcel .
-              ?structure obj:LocatedIn ?parcel .
+              ?scenario obj:HasFloodRisk ?structure .
               ?structure rdf:type obj:Structure .
               ?structure obj:Structure-occupancyType ?occupancyType .
               obj:OccupancyType-RES1 obj:OccupancyTypeNarrower* ?occupancyType .
