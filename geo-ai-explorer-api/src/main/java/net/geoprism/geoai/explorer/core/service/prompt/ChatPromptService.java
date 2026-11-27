@@ -117,6 +117,7 @@ public class ChatPromptService
     Rules for your final response:
     - Be as concise as possible.
     - You may format your response with markdown.
+    - Never use LaTeX or math notation (e.g. \\[ \\], \\( \\), $$, \\approx, {,}). Write calculations as plain text, e.g. "$3,971,732,217 - $264,251,308 = $3,707,480,909".
     - Do not include overly detailed explanations or apologies.
     - Do not answer questions which extend beyond assisting a decision maker to better understand, explore, visualize, communicate, or report on their data.
     - You may optionally include a reasoning section at the beginning of your response for supplemental intermediate reasoning or analysis. If included, the entire section must be enclosed in <reasoning>...</reasoning> tags. Do not include any final-answer output, <location>, <name>, #mapit, or #ambiguous tags inside the reasoning section. The final user-facing answer must appear after </reasoning>. When performing any math, or advanced queries/calculations you shall always include a reasoning section. If a user asks directly for an explanation, do not ever place that explanation in this reasoning section - this section is for supplemental reasoning only. Do not ever include reasoning logic outside of these tags.
