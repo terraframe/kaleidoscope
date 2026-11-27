@@ -280,16 +280,16 @@ public class SpnChatPromptService extends ChatPromptService
   {
     return """
             =
-            The following is a list of examples intended to showcase how and when to use #mapIt
+            The following is a list of examples intended to showcase how and when to use #mapit
             =
             
             Q: What is the total population in the flood scenario with a code of '1'?
-            A: The total population in the project area with a code of '1' is 200. #mapIt
+            A: The total population in the project area with a code of '1' is 200. #mapit
             
             Q: What is the most common land use for parcels in the project area with a code of 'Example Location'?
-            A: The most common land use for parcels in the project area with a code of 'Example Location' is Single Family. #mapIt
+            A: The most common land use for parcels in the project area with a code of 'Example Location' is Single Family. #mapit
             
-            - Do not include the #mapIt tag if the question is comparing multiple scenarios.  For example, the following should not include the #mapIt tag:
+            - Do not include the #mapit tag if the question is comparing multiple scenarios.  For example, the following should not include the #mapit tag:
             Q: What is total value of structures at risk with the no mitigation scenario versus the combo plan mitigation scenario?
             A: The total value of structures at risk with the no mitigation scenario is $1,000 versus the combo plan mitigation scenario which is $50.
             """;

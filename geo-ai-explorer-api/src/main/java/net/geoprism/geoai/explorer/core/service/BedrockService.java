@@ -92,7 +92,7 @@ public class BedrockService
     boolean locationFound = matcher.find();
 
     boolean mappable =
-        value.contains("#mapit");
+        value.toLowerCase().contains("#mapit");
 
     boolean ambiguous =
         !mappable &&
@@ -110,8 +110,8 @@ public class BedrockService
 
     message.setContent(
         value
-            .replace("#mapit", "")
-            .replace("#ambiguous", "")
+            .replaceAll("(?i)#mapit", "")
+            .replaceAll("(?i)#ambiguous", "")
             .replaceFirst("<name>(.*?)<\\/name>", "")
             .trim()
     );
